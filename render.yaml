@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: ce-ma
+    env: docker
+    region: frankfurt
+    dockerfilePath: Dockerfile
+
+databases:
+  - name: cema_prod
+    databaseName: cema_prod
+    user: cema
+    region: frankfurt

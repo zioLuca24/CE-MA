@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anagrafica Fornitori - Gestionale Edile</title>
+    <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<main class="page">
+    <section class="topbar">
+        <div>
+            <h1 class="title">Anagrafica Fornitori</h1>
+            <div class="muted">Elenco fornitori alimentato automaticamente dalle bolle importate</div>
+        </div>
+        <button class="btn" onclick="signOut()">Logout</button>
+    </section>
+
+    <nav class="nav">
+        <a href="dashboard.html">Dashboard</a>
+        <a href="cantieri.html">Cantieri</a>
+        <a href="personale.html">Personale</a>
+        <a class="active" href="materiali.html">Materiali</a>
+        <a href="utenti.html">Utenze</a>
+        <a href="controllo-cantiere.html">Controllo Cantiere</a>
+    </nav>
+
+    <nav class="subnav">
+        <a href="anagrafica-materiali.html">Anagrafica Materiali</a>
+        <a class="active" href="anagrafica-fornitori.html">Anagrafica Fornitori</a>
+        <a href="carica-bolla-materiali.html">Carica Bolla Materiali</a>
+    </nav>
+
+    <section class="card" style="padding: 16px; margin-bottom: 16px;">
+        <div class="toolbar" style="margin-bottom: 12px;">
+            <strong>Fornitori da bolla</strong>
+            <div style="display:flex; gap:10px; align-items:end; flex-wrap:wrap;">
+                <div class="field" style="margin:0; min-width:220px;">
+                    <label for="fornitoreFilter">Filtro nome fornitore</label>
+                    <input id="fornitoreFilter" type="text" placeholder="Cerca fornitore"
+                           style="border:1px solid var(--border);border-radius:12px;padding:10px;background:var(--bg-card-2);color:var(--text);width:100%;">
+                </div>
+                <button class="btn" onclick="loadAnagraficaFornitori()">Aggiorna</button>
+            </div>
+        </div>
+
+        <div class="table-wrap">
+            <table>
+                <thead>
+                <tr>
+                    <th>Nome Fornitore</th>
+                    <th>Materiale</th>
+                    <th>Prezzo Unitario Materiale</th>
+                </tr>
+                </thead>
+                <tbody id="rows"></tbody>
+            </table>
+            <div id="empty" class="empty" style="display:none;">Nessun fornitore disponibile. Importa prima una bolla con fornitore riconosciuto.</div>
+        </div>
+    </section>
+
+    <section class="card" style="padding: 16px;">
+        <div class="toolbar" style="margin-bottom: 12px;">
+            <strong>Confronto fornitori per materiale</strong>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                <tr>
+                    <th>Materiale</th>
+                    <th>Fornitore migliore</th>
+                    <th>Prezzo più basso</th>
+                    <th>Confronto</th>
+                </tr>
+                </thead>
+                <tbody id="confrontoRows"></tbody>
+            </table>
+            <div id="confrontoEmpty" class="empty" style="display:none;">Nessun confronto disponibile.</div>
+        </div>
+    </section>
+</main>
+
+<script src="assets/auth.js"></script>
+<script>
+    requireAuth();
+
+    function formatNumero(value) {
+        if (value === null || value === undefined) return "0";
+        return new Intl.NumberFormat("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
+    }
+
+    function renderConfronto(data) {
+        const tbody = document.getElementById("confrontoRows");
+        const empty = document.getElementById("confrontoEmpty");
+        const grouped = data.reduce((acc, item) => {
+            const key = item.materiale ?? "Sconosciuto";
+            if (!acc[key]) {
+                acc[key] = [];
+            }
+            acc[key].push(item);
+            return acc;
+        }, {});
+
+        const entries = Object.entries(grouped).map(([materiale, items]) => {
+            const sorted = [...items].sort((a, b) => (a.prezzoUnitarioMateriale || 0) - (b.prezzoUnitarioMateriale || 0));
+            const best = sorted[0];
+            const elenco = sorted.map(i => `${i.nomeFornitore} (€ ${formatNumero(i.prezzoUnitarioMateriale)})`).join("; ");
+            return {
+                materiale,
+                bestFornitore: best ? best.nomeFornitore : "",
+                prezzoMin: best ? best.prezzoUnitarioMateriale : 0,
+                elenco
+            };
+        }).sort((a, b) => a.materiale.localeCompare(b.materiale));
+
+        if (!entries.length) {
+            tbody.innerHTML = "";
+            empty.style.display = "block";
+            return;
+        }
+
+        empty.style.display = "none";
+        tbody.innerHTML = entries.map(item => `
+            <tr>
+                <td>${item.materiale}</td>
+                <td>${item.bestFornitore}</td>
+                <td>€ ${formatNumero(item.prezzoMin)}</td>
+                <td>${item.elenco}</td>
+            </tr>
+        `).join("");
+    }
+
+    async function loadAnagraficaFornitori() {
+        const rows = document.getElementById("rows");
+        const empty = document.getElementById("empty");
+        const filtro = document.getElementById("fornitoreFilter").value.trim();
+        const query = filtro ? "?fornitore=" + encodeURIComponent(filtro) : "";
+        const response = await fetch("/api/materiali/fornitori/anagrafica" + query);
+        const data = await response.json();
+
+        if (!response.ok || !data.length) {
+            rows.innerHTML = "";
+            empty.style.display = "block";
+            renderConfronto([]);
+            return;
+        }
+
+        empty.style.display = "none";
+        rows.innerHTML = data.map(item => `
+            <tr>
+                <td>${item.nomeFornitore ?? ""}</td>
+                <td>${item.materiale ?? ""}</td>
+                <td>€ ${formatNumero(item.prezzoUnitarioMateriale)}</td>
+            </tr>
+        `).join("");
+        renderConfronto(data);
+    }
+
+    document.getElementById("fornitoreFilter").addEventListener("input", function () {
+        loadAnagraficaFornitori();
+    });
+
+    loadAnagraficaFornitori();
+</script>
+</body>
+</html>

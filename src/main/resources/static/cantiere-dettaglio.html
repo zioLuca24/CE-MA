@@ -1,0 +1,512 @@
+<!doctype html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestione Cantiere - Gestionale Edile</title>
+    <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<main class="page">
+    <section class="topbar">
+        <div>
+            <h1 class="title">Gestione Cantiere</h1>
+            <div class="muted">Cantiere: <span id="cantiereNome">-</span></div>
+        </div>
+        <button class="btn" onclick="signOut()">Logout</button>
+    </section>
+
+    <nav class="nav">
+        <a href="dashboard.html">Dashboard</a>
+        <a class="active" href="cantieri.html">Cantieri</a>
+        <a href="personale.html">Personale</a>
+        <a href="materiali.html">Materiali</a>
+        <a href="utenti.html">Utenze</a>
+        <a href="controllo-cantiere.html">Controllo Cantiere</a>
+    </nav>
+
+    <section class="card" style="padding:16px; margin-bottom:16px;">
+        <div class="toolbar">
+            <strong>Dati cantiere selezionato</strong>
+            <a class="btn" style="display:inline-block;padding:8px 12px;" href="cantieri.html">Torna ad anagrafica</a>
+        </div>
+        <div class="muted" id="cantiereDettagli">Caricamento dati cantiere...</div>
+    </section>
+
+    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap:16px; margin-bottom:16px;">
+        <section class="card" style="padding:16px; border:1px solid rgba(255,255,255,0.08); box-shadow: 0 8px 24px rgba(0,0,0,0.08);">
+            <div class="toolbar" style="margin-bottom:12px; padding-bottom:8px; border-bottom:1px solid var(--border);">
+                <strong>Creazione attività</strong>
+            </div>
+            <div class="toolbar" style="align-items:end; flex-wrap:wrap; gap:12px;">
+                <div class="field" style="margin:0; min-width:220px; flex:1 1 220px;">
+                    <label for="attivitaTitolo">Nuova attività</label>
+                    <input id="attivitaTitolo" type="text" placeholder="Es. Getto fondazioni">
+                </div>
+                <div class="field" style="margin:0; min-width:180px; flex:1 1 180px;">
+                    <label for="attivitaData">Giorno pianificato</label>
+                    <input id="attivitaData" type="date">
+                </div>
+                <div class="field" style="margin:0; min-width:180px; flex:1 1 180px;">
+                    <label for="attivitaCosto">Costo manodopera (€)</label>
+                    <input id="attivitaCosto" type="number" step="0.01" min="0" placeholder="0.00">
+                </div>
+                <button class="btn" onclick="creaAttivita()" style="align-self:flex-end;">Aggiungi attività</button>
+            </div>
+            <div id="attivitaMessage" class="muted" style="margin-top:12px; min-height:20px;"></div>
+        </section>
+
+        <section class="card" style="padding:16px; border:1px solid rgba(255,255,255,0.08); box-shadow: 0 8px 24px rgba(0,0,0,0.08);">
+            <div class="toolbar" style="margin-bottom:12px; padding-bottom:8px; border-bottom:1px solid var(--border);">
+                <strong>Alimenta attività</strong>
+            </div>
+            <div class="toolbar" style="align-items:end; flex-wrap:wrap; gap:12px; margin-bottom:12px;">
+                <div class="field" style="margin:0; min-width:240px; flex:1 1 240px;">
+                    <label for="utilizzoAttivitaId">Attività</label>
+                    <select id="utilizzoAttivitaId" style="border:1px solid var(--border);border-radius:12px;padding:10px;background:var(--bg-card-2);color:var(--text);">
+                        <option value="">Seleziona attività</option>
+                    </select>
+                </div>
+                <div class="field" style="margin:0; min-width:240px; flex:1 1 240px;">
+                    <label for="utilizzoMaterialeId">Materiale</label>
+                    <select id="utilizzoMaterialeId" style="border:1px solid var(--border);border-radius:12px;padding:10px;background:var(--bg-card-2);color:var(--text);">
+                        <option value="">Seleziona materiale</option>
+                    </select>
+                </div>
+                <div class="field" style="margin:0; min-width:140px; flex:1 1 140px;">
+                    <label for="utilizzoQuantita">Quantità usata</label>
+                    <input id="utilizzoQuantita" type="number" min="0.01" step="0.01" placeholder="0.00">
+                </div>
+                <div class="muted" id="materialeDisponibile" style="min-width:180px; flex:1 1 180px;">Disponibilità: -</div>
+                <button class="btn" onclick="aggiungiMaterialeAttivita()" style="align-self:flex-end;">Aggiungi materiale attività</button>
+            </div>
+        </section>
+    </div>
+
+    <section class="card" style="padding:16px;">
+        <div class="toolbar" style="margin-bottom:12px;">
+            <strong>Elenco attività</strong>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Attività</th>
+                    <th>Giorno pianificato</th>
+                    <th>Stato</th>
+                    <th>Costo manodopera</th>
+                    <th>Materiali usati</th>
+                    <th>Azione</th>
+                </tr>
+                </thead>
+                <tbody id="attivitaRows"></tbody>
+            </table>
+            <div id="attivitaEmpty" class="empty" style="display:none;">Nessuna attività per il cantiere selezionato.</div>
+        </div>
+    </section>
+
+    <section class="card" style="padding:16px; margin-top:16px;">
+        <div class="toolbar">
+            <strong>Gestione deposito</strong>
+            <a id="cantiereDepositoLink" class="btn" href="deposito.html">Apri deposito materiali</a>
+        </div>
+        <div class="muted">Gestisci attrezzature e materiali disponibili per questo cantiere.</div>
+    </section>
+
+    <section class="card" style="padding:16px; margin-top:16px;">
+        <div class="toolbar">
+            <strong>Consuntivo economico cantiere</strong>
+            <button class="btn" onclick="loadConsuntivo()">Aggiorna consuntivo</button>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                <tr>
+                    <th>Budget</th>
+                    <th>Costo manodopera</th>
+                    <th>Costo materiali</th>
+                    <th>Costo totale</th>
+                    <th>Scostamento</th>
+                    <th>Scostamento %</th>
+                    <th>Avanzamento %</th>
+                </tr>
+                </thead>
+                <tbody id="consuntivoRows"></tbody>
+            </table>
+            <div id="consuntivoEmpty" class="empty" style="display:none;">Consuntivo non disponibile.</div>
+        </div>
+    </section>
+
+    <section class="card" style="padding:16px; margin-top:16px;">
+        <div class="toolbar" style="align-items:end; flex-wrap:wrap;">
+            <strong>Storico movimenti materiali per attività</strong>
+            <div class="field" style="margin:0; min-width:280px;">
+                <label for="storicoAttivitaSelect">Attività</label>
+                <select id="storicoAttivitaSelect" style="border:1px solid var(--border);border-radius:12px;padding:10px;background:var(--bg-card-2);color:var(--text);">
+                    <option value="">Seleziona attività</option>
+                </select>
+            </div>
+            <button class="btn" onclick="loadMovimentiAttivita()">Aggiorna storico</button>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                <tr>
+                    <th>Data</th>
+                    <th>Tipo</th>
+                    <th>Materiale</th>
+                    <th>Quantità</th>
+                    <th>Note</th>
+                </tr>
+                </thead>
+                <tbody id="movimentiRows"></tbody>
+            </table>
+            <div id="movimentiEmpty" class="empty" style="display:none;">Nessun movimento registrato per l'attività selezionata.</div>
+        </div>
+    </section>
+</main>
+
+<script src="assets/auth.js"></script>
+<script>
+    requireAuth();
+
+    const params = new URLSearchParams(window.location.search);
+    const cantiereId = params.get("id");
+    let attivitaCorrenti = [];
+    let materialiDisponibili = [];
+
+    function euro(value) {
+        if (value === null || value === undefined) return "€ 0,00";
+        return new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" }).format(value);
+    }
+
+    function numero(value) {
+        if (value === null || value === undefined) return "0";
+        return new Intl.NumberFormat("it-IT", { maximumFractionDigits: 2 }).format(value);
+    }
+
+    function escapeHtml(value) {
+        return String(value ?? "")
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll("\"", "&quot;")
+            .replaceAll("'", "&#39;");
+    }
+
+    function showMessage(text) {
+        document.getElementById("attivitaMessage").textContent = text || "";
+    }
+
+    function parseErrorMessage(payload) {
+        if (!payload) return "Operazione non riuscita.";
+        if (typeof payload === "string") return payload;
+        return payload.message || payload.error || "Operazione non riuscita.";
+    }
+
+    function updateDisponibilitaMaterialeUi() {
+        const selectedId = document.getElementById("utilizzoMaterialeId").value;
+        const label = document.getElementById("materialeDisponibile");
+        if (!selectedId) {
+            label.textContent = "Disponibilità: -";
+            return;
+        }
+        const materiale = materialiDisponibili.find(m => String(m.materialeId) === String(selectedId));
+        if (!materiale) {
+            label.textContent = "Disponibilità: -";
+            return;
+        }
+        label.textContent = `Disponibilità: ${numero(materiale.quantitaResidua)} ${materiale.unitaMisura || ""}`.trim();
+    }
+
+    function renderAttivitaSelectors() {
+        const utilizzoSelect = document.getElementById("utilizzoAttivitaId");
+        const storicoSelect = document.getElementById("storicoAttivitaSelect");
+        const options = "<option value=''>Seleziona attività</option>" + attivitaCorrenti.map(a =>
+            `<option value="${a.attivitaId}">${escapeHtml(a.titolo)} (#${a.attivitaId})</option>`
+        ).join("");
+        utilizzoSelect.innerHTML = options;
+        storicoSelect.innerHTML = options;
+    }
+
+    function renderMaterialiSelector() {
+        const select = document.getElementById("utilizzoMaterialeId");
+        select.innerHTML = "<option value=''>Seleziona materiale</option>" + materialiDisponibili.map(m =>
+            `<option value="${m.materialeId}">${escapeHtml(m.nomeMateriale)} (residuo ${numero(m.quantitaResidua)})</option>`
+        ).join("");
+        updateDisponibilitaMaterialeUi();
+    }
+
+    async function loadMaterialiDisponibili() {
+        const response = await fetch("/api/materiali/anagrafica");
+        if (!response.ok) {
+            materialiDisponibili = [];
+            renderMaterialiSelector();
+            return;
+        }
+        const data = await response.json();
+        materialiDisponibili = (data || [])
+            .filter(m => (m.quantitaResidua || 0) > 0)
+            .map(m => ({
+                materialeId: m.materialeId,
+                nomeMateriale: m.nomeMateriale,
+                quantitaResidua: m.quantitaResidua,
+                unitaMisura: ""
+            }));
+        renderMaterialiSelector();
+    }
+
+    async function loadCantiere() {
+        const dettaglio = document.getElementById("cantiereDettagli");
+        if (!cantiereId) {
+            dettaglio.textContent = "Cantiere non selezionato. Torna in anagrafica e scegli un cantiere.";
+            return false;
+        }
+
+        const response = await fetch("/api/cantieri");
+        const data = await response.json();
+        const cantiere = (data || []).find(c => String(c.id) === String(cantiereId));
+        if (!cantiere) {
+            dettaglio.textContent = "Cantiere non trovato.";
+            return false;
+        }
+
+        document.getElementById("cantiereNome").textContent = cantiere.nome || `#${cantiere.id}`;
+        const depositoLink = document.getElementById("cantiereDepositoLink");
+        depositoLink.href = `deposito.html?cantiereId=${encodeURIComponent(cantiere.id)}`;
+        dettaglio.innerHTML = `
+            ID: <strong>${escapeHtml(cantiere.id)}</strong> ·
+            Stato: <strong>${escapeHtml(cantiere.stato || "-")}</strong> ·
+            Responsabile: <strong>${escapeHtml(cantiere.responsabile || "-")}</strong> ·
+            Budget: <strong>${euro(cantiere.budget)}</strong>
+        `;
+        return true;
+    }
+
+    async function creaAttivita() {
+        const titolo = document.getElementById("attivitaTitolo").value.trim();
+        const dataPianificata = document.getElementById("attivitaData").value;
+        const costoRaw = document.getElementById("attivitaCosto").value.trim();
+        const costo = costoRaw === "" ? 0 : parseFloat(costoRaw);
+
+        if (!titolo) {
+            showMessage("Inserisci il titolo attività.");
+            return;
+        }
+        if (Number.isNaN(costo) || costo < 0) {
+            showMessage("Il costo manodopera deve essere un numero maggiore o uguale a zero.");
+            return;
+        }
+
+        const payload = {
+            titolo: titolo,
+            descrizione: "",
+            stato: "PIANIFICATA",
+            dataPianificata: dataPianificata || null,
+            costoManodopera: costo
+        };
+
+        const response = await fetch(`/api/cantieri/${encodeURIComponent(cantiereId)}/attivita`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            showMessage(parseErrorMessage(err));
+            return;
+        }
+
+        showMessage("Attività creata.");
+        document.getElementById("attivitaTitolo").value = "";
+        document.getElementById("attivitaData").value = "";
+        document.getElementById("attivitaCosto").value = "";
+        await loadAttivita();
+        await loadConsuntivo();
+    }
+
+    async function completaAttivita(attivitaId) {
+        const payload = { stato: "COMPLETATA" };
+
+        const response = await fetch(`/api/cantieri/${encodeURIComponent(cantiereId)}/attivita/${encodeURIComponent(attivitaId)}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            showMessage(parseErrorMessage(err));
+            return;
+        }
+        showMessage("Attività completata con scarico materiali.");
+        await loadAttivita();
+        await loadConsuntivo();
+        await loadMaterialiDisponibili();
+        await loadMovimentiAttivita();
+    }
+
+    async function aggiungiMaterialeAttivita() {
+        const attivitaId = document.getElementById("utilizzoAttivitaId").value;
+        const materialeId = document.getElementById("utilizzoMaterialeId").value;
+        const quantitaRaw = document.getElementById("utilizzoQuantita").value.trim();
+        const quantita = parseFloat(quantitaRaw);
+
+        if (!attivitaId) {
+            showMessage("Seleziona l'attività a cui associare il materiale.");
+            return;
+        }
+        if (!materialeId) {
+            showMessage("Seleziona il materiale da associare.");
+            return;
+        }
+        if (quantitaRaw === "" || Number.isNaN(quantita) || quantita <= 0) {
+            showMessage("Inserisci una quantità maggiore di zero.");
+            return;
+        }
+
+        const materiale = materialiDisponibili.find(m => String(m.materialeId) === String(materialeId));
+        if (materiale && quantita > materiale.quantitaResidua) {
+            showMessage(`Quantità non disponibile per ${materiale.nomeMateriale}. Residuo: ${numero(materiale.quantitaResidua)}`);
+            return;
+        }
+
+        const payload = { materialeId: parseInt(materialeId, 10), quantita: quantita };
+        const response = await fetch(`/api/cantieri/${encodeURIComponent(cantiereId)}/attivita/${encodeURIComponent(attivitaId)}/materiali`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            showMessage(parseErrorMessage(err));
+            return;
+        }
+
+        showMessage("Materiale associato all'attività.");
+        document.getElementById("utilizzoMaterialeId").value = "";
+        document.getElementById("utilizzoQuantita").value = "";
+        await loadAttivita();
+        await loadConsuntivo();
+        await loadMaterialiDisponibili();
+        await loadMovimentiAttivita();
+    }
+
+    async function loadAttivita() {
+        const rows = document.getElementById("attivitaRows");
+        const empty = document.getElementById("attivitaEmpty");
+        rows.innerHTML = "";
+
+        const response = await fetch(`/api/cantieri/${encodeURIComponent(cantiereId)}/attivita`);
+        if (!response.ok) {
+            empty.style.display = "block";
+            empty.textContent = "Errore caricamento attività.";
+            return;
+        }
+
+        const data = await response.json();
+        attivitaCorrenti = data || [];
+        renderAttivitaSelectors();
+        if (!data.length) {
+            empty.style.display = "block";
+            empty.textContent = "Nessuna attività per il cantiere selezionato.";
+            return;
+        }
+        empty.style.display = "none";
+
+        rows.innerHTML = data.map(item => {
+            const materiali = (item.materialiUtilizzati || [])
+                .map(m => `${escapeHtml(m.materialeNome)} | ${numero(m.quantita)}`)
+                .join("<br>");
+            return `
+            <tr data-id="${item.attivitaId}" data-titolo="${escapeHtml(item.titolo || "")}" data-costo="${item.costoManodopera || 0}">
+                <td>${item.attivitaId ?? ""}</td>
+                <td>${escapeHtml(item.titolo ?? "")}</td>
+                <td>${escapeHtml(item.dataPianificata || "-")}</td>
+                <td>${escapeHtml(item.stato ?? "")}</td>
+                <td>${euro(item.costoManodopera)}</td>
+                <td>${materiali || "-"}</td>
+                <td>${item.stato === "COMPLETATA" ? "Completata" : `<button class="btn" onclick="completaAttivita(${item.attivitaId})">Completa</button>`}</td>
+            </tr>`;
+        }).join("");
+    }
+
+    async function loadMovimentiAttivita() {
+        const attivitaId = document.getElementById("storicoAttivitaSelect").value;
+        const rows = document.getElementById("movimentiRows");
+        const empty = document.getElementById("movimentiEmpty");
+        rows.innerHTML = "";
+
+        if (!attivitaId) {
+            empty.style.display = "block";
+            empty.textContent = "Seleziona un'attività per visualizzare i movimenti.";
+            return;
+        }
+
+        const response = await fetch(`/api/cantieri/${encodeURIComponent(cantiereId)}/attivita/${encodeURIComponent(attivitaId)}/movimenti`);
+        if (!response.ok) {
+            empty.style.display = "block";
+            empty.textContent = "Errore caricamento storico movimenti.";
+            return;
+        }
+
+        const data = await response.json();
+        if (!data.length) {
+            empty.style.display = "block";
+            empty.textContent = "Nessun movimento registrato per l'attività selezionata.";
+            return;
+        }
+        empty.style.display = "none";
+        rows.innerHTML = data.map(m => `
+            <tr>
+                <td>${escapeHtml(m.dataMovimento || "-")}</td>
+                <td>${escapeHtml(m.tipoMovimento || "-")}</td>
+                <td>${escapeHtml(m.materialeNome || "-")}</td>
+                <td>${numero(m.quantita)}</td>
+                <td>${escapeHtml(m.note || "")}</td>
+            </tr>
+        `).join("");
+    }
+
+    async function loadConsuntivo() {
+        const rows = document.getElementById("consuntivoRows");
+        const empty = document.getElementById("consuntivoEmpty");
+        rows.innerHTML = "";
+
+        const response = await fetch(`/api/cantieri/${encodeURIComponent(cantiereId)}/consuntivo`);
+        if (!response.ok) {
+            empty.style.display = "block";
+            return;
+        }
+        const c = await response.json();
+        empty.style.display = "none";
+        rows.innerHTML = `
+            <tr>
+                <td>${euro(c.budgetCantiere)}</td>
+                <td>${euro(c.costoManodopera)}</td>
+                <td>${euro(c.costoMateriali)}</td>
+                <td>${euro(c.costoTotale)}</td>
+                <td>${euro(c.scostamento)}</td>
+                <td>${numero(c.scostamentoPercentuale)}%</td>
+                <td>${numero(c.avanzamentoPercentuale)}%</td>
+            </tr>
+        `;
+    }
+
+    async function bootstrap() {
+        const ok = await loadCantiere();
+        if (!ok) return;
+        await loadAttivita();
+        await loadMaterialiDisponibili();
+        await loadConsuntivo();
+    }
+
+    document.getElementById("utilizzoMaterialeId").addEventListener("change", updateDisponibilitaMaterialeUi);
+    document.getElementById("storicoAttivitaSelect").addEventListener("change", loadMovimentiAttivita);
+
+    bootstrap();
+</script>
+</body>
+</html>

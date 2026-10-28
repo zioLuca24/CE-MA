@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modifica Dipendente - Gestionale Edile</title>
+    <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<main class="page">
+    <section class="topbar">
+        <div>
+            <h1 class="title">Modifica Dipendente</h1>
+            <div class="muted">Visualizza i dati in sola lettura e modifica gli attributi del dipendente.</div>
+        </div>
+        <button class="btn" onclick="signOut()">Logout</button>
+    </section>
+
+    <nav class="nav">
+        <a href="dashboard.html">Dashboard</a>
+        <a href="cantieri.html">Cantieri</a>
+        <a class="active" href="personale.html">Personale</a>
+        <a href="materiali.html">Materiali</a>
+        <a href="utenti.html">Utenze</a>
+        <a href="controllo-cantiere.html">Controllo Cantiere</a>
+    </nav>
+
+    <section class="card" style="padding:16px; margin-bottom:16px;">
+        <div class="toolbar">
+            <a class="btn" href="anagrafica-personale.html">Torna ad anagrafica personale</a>
+            <span id="editDipendenteMessage" class="muted"></span>
+        </div>
+
+        <div class="field" style="margin:0 0 12px 0; min-width:320px;">
+            <label for="editDipendenteId">Seleziona dipendente da visualizzare/modificare</label>
+            <select id="editDipendenteId" onchange="onDipendenteSelectionChange()" style="border:1px solid var(--border);border-radius:12px;padding:10px;background:var(--bg-card-2);color:var(--text);">
+                <option value="">Seleziona dipendente</option>
+            </select>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+            <section class="card" style="padding:16px;">
+                <h3 style="margin:0 0 10px 0;">Dati dipendente (sola lettura)</h3>
+                <div class="field" style="margin:0 0 10px 0;">
+                    <label for="viewNome">Nome</label>
+                    <input id="viewNome" readonly>
+                </div>
+                <div class="field" style="margin:0 0 10px 0;">
+                    <label for="viewCognome">Cognome</label>
+                    <input id="viewCognome" readonly>
+                </div>
+                <div class="field" style="margin:0 0 10px 0;">
+                    <label for="viewQualifica">Qualifica</label>
+                    <input id="viewQualifica" readonly>
+                </div>
+                <div class="field" style="margin:0 0 10px 0;">
+                    <label for="viewDataAssunzione">Data assunzione</label>
+                    <input id="viewDataAssunzione" readonly>
+                </div>
+                <div class="field" style="margin:0 0 10px 0;">
+                    <label for="viewStato">Stato</label>
+                    <input id="viewStato" readonly>
+                </div>
+                <div class="field" style="margin:0 0 10px 0;">
+                    <label for="viewTelefono">Telefono</label>
+                    <input id="viewTelefono" readonly>
+                </div>
+                <div class="field" style="margin:0;">
+                    <label for="viewEmail">Email</label>
+                    <input id="viewEmail" readonly>
+                </div>
+            </section>
+
+            <section class="card" style="padding:16px;">
+                <h3 style="margin:0 0 10px 0;">Modifica dipendente</h3>
+                <div id="editDipendentePanel">
+                    <div class="field" style="margin:0 0 10px 0;">
+                        <label for="editNome">Nome</label>
+                        <input id="editNome" type="text" required>
+                    </div>
+                    <div class="field" style="margin:0 0 10px 0;">
+                        <label for="editCognome">Cognome</label>
+                        <input id="editCognome" type="text" required>
+                    </div>
+                    <div class="field" style="margin:0 0 10px 0;">
+                        <label for="editQualifica">Qualifica</label>
+                        <input id="editQualifica" type="text">
+                    </div>
+                    <div class="field" style="margin:0 0 10px 0;">
+                        <label for="editDataAssunzione">Data assunzione</label>
+                        <input id="editDataAssunzione" type="date">
+                    </div>
+                    <div class="field" style="margin:0 0 10px 0;">
+                        <label for="editStato">Stato</label>
+                        <select id="editStato" style="border:1px solid var(--border);border-radius:12px;padding:10px;background:var(--bg-card-2);color:var(--text);">
+                            <option value="IN SERVIZIO">IN SERVIZIO</option>
+                            <option value="NON ASSEGNATO">NON ASSEGNATO</option>
+                            <option value="IN FERIE">IN FERIE</option>
+                            <option value="IN PAUSA">IN PAUSA</option>
+                            <option value="ATTIVO">ATTIVO</option>
+                            <option value="INATTIVO">INATTIVO</option>
+                            <option value="SOSPESO">SOSPESO</option>
+                        </select>
+                    </div>
+                    <div class="field" style="margin:0 0 10px 0;">
+                        <label for="editTelefono">Telefono</label>
+                        <input id="editTelefono" type="text">
+                    </div>
+                    <div class="field" style="margin:0 0 12px 0;">
+                        <label for="editEmail">Email</label>
+                        <input id="editEmail" type="email">
+                    </div>
+                    <button type="button" class="btn" onclick="salvaDipendente()">Salva modifiche dipendente</button>
+                </div>
+            </section>
+        </div>
+    </section>
+</main>
+
+<script src="assets/auth.js"></script>
+<script>
+    requireAuth();
+
+    const dipendentiCache = [];
+
+    function setFieldValue(id, value) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.value = value == null ? "" : String(value);
+    }
+
+    function renderDipendentiSelect(dipendenti, preferredId) {
+        const select = document.getElementById("editDipendenteId");
+        const selected = preferredId || select.value;
+        select.innerHTML = "<option value=''>Seleziona dipendente</option>" +
+            dipendenti.map(d => `<option value="${d.id}">${d.nome} ${d.cognome} - ${d.qualifica ?? ""}</option>`).join("");
+        if (selected && dipendenti.some(d => String(d.id) === String(selected))) {
+            select.value = selected;
+        }
+        onDipendenteSelectionChange();
+    }
+
+    async function loadDipendenti(preferredId) {
+        const message = document.getElementById("editDipendenteMessage");
+        message.textContent = "";
+        const response = await fetch("/api/dipendenti");
+        if (!response.ok) {
+            message.textContent = "Errore nel caricamento dipendenti.";
+            return;
+        }
+        const data = await response.json();
+        dipendentiCache.length = 0;
+        data.forEach(d => dipendentiCache.push(d));
+        renderDipendentiSelect(data, preferredId);
+        if (preferredId && !data.some(d => String(d.id) === String(preferredId))) {
+            message.textContent = `Dipendente con ID ${preferredId} non trovato.`;
+        }
+    }
+
+    function onDipendenteSelectionChange() {
+        const id = document.getElementById("editDipendenteId").value;
+        const dipendente = dipendentiCache.find(d => String(d.id) === String(id));
+
+        if (!dipendente) {
+            setFieldValue("viewNome", "");
+            setFieldValue("viewCognome", "");
+            setFieldValue("viewQualifica", "");
+            setFieldValue("viewDataAssunzione", "");
+            setFieldValue("viewStato", "");
+            setFieldValue("viewTelefono", "");
+            setFieldValue("viewEmail", "");
+            setFieldValue("editNome", "");
+            setFieldValue("editCognome", "");
+            setFieldValue("editQualifica", "");
+            setFieldValue("editDataAssunzione", "");
+            setFieldValue("editStato", "ATTIVO");
+            setFieldValue("editTelefono", "");
+            setFieldValue("editEmail", "");
+            return;
+        }
+
+        setFieldValue("viewNome", dipendente.nome);
+        setFieldValue("viewCognome", dipendente.cognome);
+        setFieldValue("viewQualifica", dipendente.qualifica);
+        setFieldValue("viewDataAssunzione", dipendente.dataAssunzione);
+        setFieldValue("viewStato", dipendente.stato);
+        setFieldValue("viewTelefono", dipendente.telefono);
+        setFieldValue("viewEmail", dipendente.email);
+
+        setFieldValue("editNome", dipendente.nome);
+        setFieldValue("editCognome", dipendente.cognome);
+        setFieldValue("editQualifica", dipendente.qualifica);
+        setFieldValue("editDataAssunzione", dipendente.dataAssunzione);
+        setFieldValue("editStato", dipendente.stato || "ATTIVO");
+        setFieldValue("editTelefono", dipendente.telefono);
+        setFieldValue("editEmail", dipendente.email);
+    }
+
+    async function salvaDipendente() {
+        const message = document.getElementById("editDipendenteMessage");
+        message.textContent = "";
+
+        const id = document.getElementById("editDipendenteId").value;
+        if (!id) {
+            message.textContent = "Seleziona un dipendente.";
+            return;
+        }
+
+        const payload = {
+            nome: document.getElementById("editNome").value.trim(),
+            cognome: document.getElementById("editCognome").value.trim(),
+            qualifica: document.getElementById("editQualifica").value.trim() || null,
+            dataAssunzione: document.getElementById("editDataAssunzione").value || null,
+            stato: document.getElementById("editStato").value,
+            telefono: document.getElementById("editTelefono").value.trim() || null,
+            email: document.getElementById("editEmail").value.trim() || null
+        };
+
+        if (!payload.nome || !payload.cognome) {
+            message.textContent = "Nome e cognome sono obbligatori.";
+            return;
+        }
+
+        const response = await fetch(`/api/dipendenti/${encodeURIComponent(id)}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+            message.textContent = "Errore aggiornamento dipendente.";
+            return;
+        }
+
+        message.textContent = "Dipendente aggiornato.";
+        await loadDipendenti();
+        document.getElementById("editDipendenteId").value = String(id);
+        onDipendenteSelectionChange();
+    }
+
+    const dipendenteIdFromQuery = new URLSearchParams(window.location.search).get("id");
+    loadDipendenti(dipendenteIdFromQuery);
+</script>
+</body>
+</html>

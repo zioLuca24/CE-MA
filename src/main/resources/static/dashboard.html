@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestionale Edile - Dashboard</title>
+    <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<main class="page">
+    <section class="topbar">
+        <div class="brand">
+            <img src="assets/logo.svg" alt="Logo azienda">
+            <div>
+                <h1 class="title">CE.MA. Costruzioni</h1>
+                <div class="muted">Benvenuto, <span id="currentUser"></span></div>
+            </div>
+        </div>
+        <button class="btn" onclick="signOut()">Logout</button>
+    </section>
+
+    <nav class="nav">
+        <a class="active" href="dashboard.html">Dashboard</a>
+        <a href="cantieri.html">Cantieri</a>
+        <a href="personale.html">Personale</a>
+        <a href="materiali.html">Materiali</a>
+        <a href="utenti.html">Utenze</a>
+        <a href="controllo-cantiere.html">Controllo Cantiere</a>
+    </nav>
+
+    <section class="card" style="padding: 18px;">
+        <div class="toolbar">
+            <h2 style="margin: 0;">Quick actions</h2>
+            <span class="chip">Operativo</span>
+        </div>
+        <div class="actions-grid">
+            <article class="action-card">
+                <h3>Gestione Cantieri</h3>
+                <p>Visualizza stato, responsabile e dettagli dei cantieri attivi.</p>
+                <a class="action-link" href="cantieri.html">Apri modulo cantieri →</a>
+            </article>
+            <article class="action-card">
+                <h3>Gestione Personale</h3>
+                <p>Accedi ai sottomenu anagrafica personale e turni su calendario.</p>
+                <a class="action-link" href="personale.html">Apri modulo personale →</a>
+            </article>
+            <article class="action-card">
+                <h3>Gestione Materiali</h3>
+                <p>Accedi ai sottomenu anagrafica e carica bolla materiali.</p>
+                <a class="action-link" href="materiali.html">Apri modulo materiali →</a>
+            </article>
+            <article class="action-card">
+                <h3>Gestione Utenze</h3>
+                <p>Crea utenti applicativi, ruoli, stato attivo e cambio password.</p>
+                <a class="action-link" href="utenti.html">Apri gestione utenze →</a>
+            </article>
+            <article class="action-card">
+                <h3>Controllo Cantiere</h3>
+                <p>KPI materiali, forecast fabbisogni, report comparativi e alert sprechi.</p>
+                <a class="action-link" href="controllo-cantiere.html">Apri controllo cantiere →</a>
+            </article>
+        </div>
+    </section>
+</main>
+
+<script src="assets/auth.js"></script>
+<script>
+    requireAuth();
+    document.getElementById("currentUser").textContent = currentUser();
+</script>
+</body>
+</html>

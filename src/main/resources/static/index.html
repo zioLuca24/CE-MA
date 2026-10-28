@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CE.MA. Costruzioni - Login</title>
+    <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<div class="login-wrap">
+    <div class="card login-card">
+        <div class="brand">
+            <img src="assets/logo.svg" alt="Logo azienda">
+            <h1>CE.MA. Costruzioni</h1>
+        </div>
+        <p class="subtitle">Accedi alla piattaforma operativa cantieri, personale e materiali.</p>
+
+        <form id="loginForm">
+            <div class="field">
+                <label for="username">Username</label>
+                <input id="username" name="username" type="text" placeholder="Inserisci username" required>
+            </div>
+            <div class="field">
+                <label for="password">Password</label>
+                <input id="password" name="password" type="password" placeholder="Inserisci password" required>
+                <label style="display:flex;align-items:center;gap:8px;font-size:0.85rem;color:var(--muted);margin-top:2px;">
+                    <input id="togglePassword" type="checkbox" style="margin:0;">
+                    Mostra password
+                </label>
+            </div>
+            <button class="btn" type="submit">Entra</button>
+            <div class="alert" id="loginError"></div>
+        </form>
+    </div>
+</div>
+
+<script src="assets/auth.js"></script>
+<script>
+    if (currentUser()) {
+        window.location.href = "dashboard.html";
+    }
+
+    document.getElementById("togglePassword").addEventListener("change", function () {
+        const passwordInput = document.getElementById("password");
+        passwordInput.type = this.checked ? "text" : "password";
+    });
+
+    document.getElementById("loginForm").addEventListener("submit", async function (event) {
+        event.preventDefault();
+        const username = document.getElementById("username").value.trim();
+        const password = document.getElementById("password").value;
+        const error = document.getElementById("loginError");
+        error.textContent = "";
+
+        if (!username || !password) {
+            error.textContent = "Inserisci username e password.";
+            return;
+        }
+
+        try {
+            const response = await fetch("/api/auth/login", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ username, password })
+            });
+
+            if (!response.ok) {
+                error.textContent = "Credenziali non valide.";
+                return;
+            }
+
+            const data = await response.json();
+            signIn({
+                token: data.token,
+                username: data.username,
+                nomeCompleto: data.nomeCompleto || "",
+                ruolo: data.ruolo || "OPERATORE"
+            });
+            window.location.href = "dashboard.html";
+        } catch (e) {
+            error.textContent = "Errore di connessione al servizio di login.";
+        }
+    });
+</script>
+</body>
+</html>

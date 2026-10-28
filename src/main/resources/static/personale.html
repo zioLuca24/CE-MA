@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personale - Gestionale Edile</title>
+    <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<main class="page">
+    <section class="topbar">
+        <div>
+            <h1 class="title">Personale</h1>
+            <div class="muted">Menu personale con sottomoduli operativi</div>
+        </div>
+        <button class="btn" onclick="signOut()">Logout</button>
+    </section>
+
+    <nav class="nav">
+        <a href="dashboard.html">Dashboard</a>
+        <a href="cantieri.html">Cantieri</a>
+        <a class="active" href="personale.html">Personale</a>
+        <a href="materiali.html">Materiali</a>
+        <a href="utenti.html">Utenze</a>
+        <a href="controllo-cantiere.html">Controllo Cantiere</a>
+    </nav>
+
+    <section class="card" style="padding: 18px;">
+        <div class="toolbar">
+            <h2 style="margin: 0;">Sottomenu Personale</h2>
+            <span class="chip">2 moduli</span>
+        </div>
+        <div class="actions-grid">
+            <article class="action-card">
+                <h3>Anagrafica Personale</h3>
+                <p>Gestione dipendenti con dati anagrafici, ruolo e stato.</p>
+                <a class="action-link" href="anagrafica-personale.html">Apri anagrafica →</a>
+            </article>
+            <article class="action-card">
+                <h3>Turni Personale</h3>
+                <p>Calendario dedicato per dipendente con turni e cantiere associato.</p>
+                <a class="action-link" href="turni-personale.html">Apri turni personale →</a>
+            </article>
+        </div>
+    </section>
+</main>
+
+<script src="assets/auth.js"></script>
+<script>
+    requireAuth();
+</script>
+</body>
+</html>

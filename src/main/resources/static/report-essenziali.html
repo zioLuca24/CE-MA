@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Report Essenziali - Gestionale Edile</title>
+    <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<main class="page">
+    <section class="topbar">
+        <div>
+            <h1 class="title">Report Essenziali</h1>
+            <div class="muted">Consumi del mese e scostamento per cantiere</div>
+        </div>
+        <button class="btn" onclick="signOut()">Logout</button>
+    </section>
+
+    <nav class="nav">
+        <a href="dashboard.html">Dashboard</a>
+        <a href="cantieri.html">Cantieri</a>
+        <a href="personale.html">Personale</a>
+        <a href="materiali.html">Materiali</a>
+        <a href="utenti.html">Utenze</a>
+        <a class="active" href="controllo-cantiere.html">Controllo Cantiere</a>
+    </nav>
+
+    <nav class="subnav">
+        <a href="analisi-sprechi.html">Soglie e Alert</a>
+        <a href="kpi-cantiere.html">KPI Cantiere</a>
+        <a href="forecast-fabbisogni.html">Forecast Fabbisogni</a>
+        <a class="active" href="report-essenziali.html">Report Essenziali</a>
+    </nav>
+
+    <section class="card" style="padding:16px;">
+        <div class="toolbar" style="align-items:end; flex-wrap:wrap;">
+            <div class="field" style="margin:0; min-width:200px;">
+                <label for="monthRef">Mese di riferimento</label>
+                <input id="monthRef" type="month">
+            </div>
+            <button class="btn" onclick="loadReport()">Aggiorna report</button>
+            <button class="btn btn-secondary" onclick="exportCsv()">Esporta CSV</button>
+        </div>
+
+        <div class="table-wrap">
+            <table>
+                <thead>
+                <tr>
+                    <th>Cantiere</th>
+                    <th>Consumo mese (q.tà)</th>
+                    <th>Consumo mese (€)</th>
+                    <th>Budget (€)</th>
+                    <th>Costo totale (€)</th>
+                    <th>Scostamento (€)</th>
+                    <th>Scostamento (%)</th>
+                </tr>
+                </thead>
+                <tbody id="reportRows"></tbody>
+            </table>
+            <div id="reportEmpty" class="empty" style="display:none;">Nessun dato disponibile per il mese selezionato.</div>
+        </div>
+    </section>
+</main>
+
+<script src="assets/auth.js"></script>
+<script>
+    requireAuth();
+    let currentRows = [];
+
+    function n(value) {
+        if (value === null || value === undefined) return "-";
+        return new Intl.NumberFormat("it-IT", { maximumFractionDigits: 2 }).format(value);
+    }
+
+    function euro(value) {
+        if (value === null || value === undefined) return "€ 0,00";
+        return new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" }).format(value);
+    }
+
+    function pct(value) {
+        if (value === null || value === undefined) return "-";
+        return `${n(value)}%`;
+    }
+
+    async function loadReport() {
+        const month = document.getElementById("monthRef").value;
+        const query = month ? `?month=${encodeURIComponent(month)}` : "";
+        const response = await fetch("/api/analisi/report/essenziale" + query);
+        if (response.status === 404) {
+            currentRows = await loadReportFallback(month);
+        } else {
+            const data = await response.json();
+            currentRows = Array.isArray(data) ? data : [];
+        }
+
+        const rows = document.getElementById("reportRows");
+        const empty = document.getElementById("reportEmpty");
+        if (!currentRows.length) {
+            rows.innerHTML = "";
+            empty.style.display = "block";
+            return;
+        }
+
+        empty.style.display = "none";
+        rows.innerHTML = currentRows.map(r => `
+            <tr>
+                <td>${r.cantiereNome ?? ""}</td>
+                <td>${n(r.consumoMeseQuantita)}</td>
+                <td>${euro(r.consumoMeseCosto)}</td>
+                <td>${euro(r.budgetCantiere)}</td>
+                <td>${euro(r.costoTotaleCantiere)}</td>
+                <td>${euro(r.scostamento)}</td>
+                <td>${pct(r.scostamentoPercentuale)}</td>
+            </tr>
+        `).join("");
+    }
+
+    async function loadReportFallback(month) {
+        const query = month ? `?month=${encodeURIComponent(month)}` : "";
+        const [cantieriResponse, comparativoResponse] = await Promise.all([
+            fetch("/api/cantieri"),
+            fetch("/api/analisi/report/comparativo-cantieri" + query)
+        ]);
+        const cantieri = await cantieriResponse.json();
+        const comparativoRows = await comparativoResponse.json();
+        const comparativoById = new Map((comparativoRows || []).map(r => [r.cantiereId, r]));
+
+        const rows = await Promise.all((cantieri || []).map(async (cantiere) => {
+            const consuntivoResponse = await fetch(`/api/cantieri/${encodeURIComponent(cantiere.id)}/consuntivo`);
+            const consuntivo = await consuntivoResponse.json();
+            const comparativo = comparativoById.get(cantiere.id) || {};
+            return {
+                mese: month || "",
+                cantiereId: cantiere.id,
+                cantiereNome: cantiere.nome || "",
+                consumoMeseQuantita: comparativo.quantitaConsumata || 0,
+                consumoMeseCosto: comparativo.costoConsumoMateriali || 0,
+                budgetCantiere: cantiere.budget || 0,
+                costoTotaleCantiere: consuntivo.costoTotale || 0,
+                scostamento: consuntivo.scostamento || 0,
+                scostamentoPercentuale: consuntivo.budget > 0
+                    ? ((consuntivo.scostamento || 0) / consuntivo.budget) * 100
+                    : 0
+            };
+        }));
+        rows.sort((a, b) => (b.scostamentoPercentuale || 0) - (a.scostamentoPercentuale || 0));
+        return rows;
+    }
+
+    function exportCsv() {
+        if (!currentRows.length) {
+            alert("Nessun dato da esportare.");
+            return;
+        }
+
+        const header = [
+            "mese",
+            "cantiere",
+            "consumo_mese_quantita",
+            "consumo_mese_costo",
+            "budget_cantiere",
+            "costo_totale_cantiere",
+            "scostamento",
+            "scostamento_percentuale"
+        ];
+
+        const lines = [header.join(";")];
+        currentRows.forEach(r => {
+            lines.push([
+                r.mese ?? "",
+                r.cantiereNome ?? "",
+                (r.consumoMeseQuantita ?? 0),
+                (r.consumoMeseCosto ?? 0),
+                (r.budgetCantiere ?? 0),
+                (r.costoTotaleCantiere ?? 0),
+                (r.scostamento ?? 0),
+                (r.scostamentoPercentuale ?? 0)
+            ].join(";"));
+        });
+
+        const csvContent = "\ufeff" + lines.join("\n");
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        const month = document.getElementById("monthRef").value || "corrente";
+        link.href = url;
+        link.download = `report-essenziale-${month}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    }
+
+    (function initMonth() {
+        const today = new Date();
+        const month = String(today.getMonth() + 1).padStart(2, "0");
+        document.getElementById("monthRef").value = `${today.getFullYear()}-${month}`;
+    })();
+
+    loadReport();
+</script>
+</body>
+</html>

@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KPI Cantiere - Gestionale Edile</title>
+    <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<main class="page">
+    <section class="topbar">
+        <div>
+            <h1 class="title">KPI Cantiere</h1>
+            <div class="muted">Scostamento materiali previsto vs usato</div>
+        </div>
+        <button class="btn" onclick="signOut()">Logout</button>
+    </section>
+
+    <nav class="nav">
+        <a href="dashboard.html">Dashboard</a>
+        <a href="cantieri.html">Cantieri</a>
+        <a href="personale.html">Personale</a>
+        <a href="materiali.html">Materiali</a>
+        <a href="utenti.html">Utenze</a>
+        <a class="active" href="controllo-cantiere.html">Controllo Cantiere</a>
+    </nav>
+
+    <nav class="subnav">
+        <a href="analisi-sprechi.html">Soglie e Alert</a>
+        <a class="active" href="kpi-cantiere.html">KPI Cantiere</a>
+        <a href="forecast-fabbisogni.html">Forecast Fabbisogni</a>
+        <a href="report-essenziali.html">Report Essenziali</a>
+    </nav>
+
+    <section class="card" style="padding:16px;">
+        <div class="toolbar" style="align-items:end; flex-wrap:wrap;">
+            <div class="field" style="margin:0; min-width:280px;">
+                <label for="cantiereFilter">Cantiere</label>
+                <select id="cantiereFilter" style="border:1px solid var(--border);border-radius:12px;padding:10px;background:var(--bg-card-2);color:var(--text);">
+                    <option value="">Seleziona cantiere</option>
+                </select>
+            </div>
+            <button class="btn" onclick="loadKpi()">Aggiorna KPI</button>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                <tr>
+                    <th>Materiale</th>
+                    <th>Previsto</th>
+                    <th>Usato</th>
+                    <th>Scostamento</th>
+                    <th>Scostamento %</th>
+                </tr>
+                </thead>
+                <tbody id="rows"></tbody>
+            </table>
+            <div id="empty" class="empty" style="display:none;">Nessun KPI disponibile per il cantiere selezionato.</div>
+        </div>
+    </section>
+</main>
+
+<script src="assets/auth.js"></script>
+<script>
+    requireAuth();
+
+    function n(value) {
+        if (value === null || value === undefined) return "0";
+        return new Intl.NumberFormat("it-IT", { maximumFractionDigits: 2 }).format(value);
+    }
+
+    async function loadCantieri() {
+        const response = await fetch("/api/cantieri");
+        const data = await response.json();
+        const select = document.getElementById("cantiereFilter");
+        select.innerHTML = "<option value=''>Seleziona cantiere</option>" +
+            data.map(c => `<option value="${c.id}">${c.nome}</option>`).join("");
+    }
+
+    async function loadKpi() {
+        const cantiereId = document.getElementById("cantiereFilter").value;
+        const rows = document.getElementById("rows");
+        const empty = document.getElementById("empty");
+        rows.innerHTML = "";
+        if (!cantiereId) {
+            empty.style.display = "block";
+            empty.textContent = "Seleziona un cantiere per vedere i KPI.";
+            return;
+        }
+
+        const response = await fetch(`/api/analisi/kpi/materiali-cantiere?cantiereId=${encodeURIComponent(cantiereId)}`);
+        const data = await response.json();
+        if (!data.length) {
+            empty.style.display = "block";
+            empty.textContent = "Nessun KPI disponibile per il cantiere selezionato.";
+            return;
+        }
+        empty.style.display = "none";
+        rows.innerHTML = data.map(r => `
+            <tr>
+                <td>${r.materialeNome ?? ""}</td>
+                <td>${n(r.quantitaPrevista)}</td>
+                <td>${n(r.quantitaUsata)}</td>
+                <td>${n(r.scostamento)}</td>
+                <td>${n(r.scostamentoPercentuale)}%</td>
+            </tr>
+        `).join("");
+    }
+
+    loadCantieri();
+</script>
+</body>
+</html>

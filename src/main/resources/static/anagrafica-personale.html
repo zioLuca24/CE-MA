@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anagrafica Personale - Gestionale Edile</title>
+    <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<main class="page">
+    <section class="topbar">
+        <div>
+            <h1 class="title">Anagrafica Personale</h1>
+            <div class="muted">Anagrafica e stato del personale</div>
+        </div>
+        <button class="btn" onclick="signOut()">Logout</button>
+    </section>
+
+    <nav class="nav">
+        <a href="dashboard.html">Dashboard</a>
+        <a href="cantieri.html">Cantieri</a>
+        <a class="active" href="personale.html">Personale</a>
+        <a href="materiali.html">Materiali</a>
+        <a href="utenti.html">Utenze</a>
+        <a href="controllo-cantiere.html">Controllo Cantiere</a>
+    </nav>
+
+    <nav class="subnav">
+        <a class="active" href="anagrafica-personale.html">Anagrafica Personale</a>
+        <a href="turni-personale.html">Turni Personale</a>
+    </nav>
+
+    <section class="card" style="padding: 16px;">
+        <div class="toolbar" style="align-items:flex-end; flex-wrap:wrap;">
+            <strong>Totale: <span id="totalCount">0</span></strong>
+            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:end;">
+                <div class="field" style="margin:0; min-width:220px;">
+                    <label for="personaleFilter">Cerca dipendente</label>
+                    <input id="personaleFilter" type="text" placeholder="Nome, cognome o qualifica">
+                </div>
+                <div class="field" style="margin:0; min-width:170px;">
+                    <label for="statoFilter">Stato</label>
+                    <select id="statoFilter" style="border:1px solid var(--border);border-radius:12px;padding:10px;background:var(--bg-card-2);color:var(--text);">
+                        <option value="">Tutti</option>
+                        <option value="IN SERVIZIO">In servizio</option>
+                        <option value="NON ASSEGNATO">Non assegnato</option>
+                        <option value="IN FERIE">In ferie</option>
+                        <option value="IN PAUSA">In pausa</option>
+                        <option value="ATTIVO">Attivo</option>
+                        <option value="INATTIVO">Inattivo</option>
+                        <option value="SOSPESO">Sospeso</option>
+                    </select>
+                </div>
+                <button class="btn" onclick="loadPersonale()">Aggiorna</button>
+                <a class="btn" href="nuovo-dipendente.html">Aggiungi personale</a>
+                <button class="btn" onclick="window.location.href='assegna-turno.html'">Assegna Turno</button>
+            </div>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Nome</th>
+                    <th>Cognome</th>
+                    <th>Qualifica</th>
+                    <th>Cantiere</th>
+                    <th>Email</th>
+                    <th>Stato</th>
+                    <th>Operazioni</th>
+                </tr>
+                </thead>
+                <tbody id="rows"></tbody>
+            </table>
+            <div id="empty" class="empty" style="display:none;">Nessun dipendente disponibile.</div>
+        </div>
+    </section>
+</main>
+
+<script src="assets/auth.js"></script>
+<script>
+    requireAuth();
+
+    function normalizeStatus(value) {
+        return (value || "").toString().trim().toUpperCase();
+    }
+
+    function getCantiereLabel(assegnazioni, dipendenteId) {
+        const assegnazione = (assegnazioni || []).find(a => String(a.dipendente && a.dipendente.id !== undefined ? a.dipendente.id : a.dipendenteId) === String(dipendenteId));
+        if (!assegnazione || !assegnazione.cantiere) {
+            return "N/D";
+        }
+        return assegnazione.cantiere.nome || "N/D";
+    }
+
+    async function loadPersonale() {
+        const rows = document.getElementById("rows");
+        const empty = document.getElementById("empty");
+        const filterValue = document.getElementById("personaleFilter").value.trim().toLowerCase();
+        const statoValue = normalizeStatus(document.getElementById("statoFilter").value);
+
+        rows.innerHTML = "";
+        const [dipendentiResponse, assegnazioniResponse] = await Promise.all([
+            fetch("/api/dipendenti"),
+            fetch("/api/assegnazioni")
+        ]);
+        const data = await dipendentiResponse.json();
+        const assegnazioni = await assegnazioniResponse.json();
+
+        const filtered = data.filter(item => {
+            const searchText = [item.nome, item.cognome, item.qualifica, item.email].join(" ").toLowerCase();
+            const matchesText = !filterValue || searchText.includes(filterValue);
+            const matchesStato = !statoValue || normalizeStatus(item.stato) === statoValue;
+            return matchesText && matchesStato;
+        });
+
+        document.getElementById("totalCount").textContent = filtered.length;
+
+        if (!filtered.length) {
+            empty.style.display = "block";
+            return;
+        }
+        empty.style.display = "none";
+
+        rows.innerHTML = filtered.map(item => {
+            const cantiere = getCantiereLabel(assegnazioni, item.id);
+            const stato = normalizeStatus(item.stato) || "NON ASSEGNATO";
+            const badgeClass = ["ATTIVO", "IN SERVIZIO"].includes(stato) ? "status status-active" : "status status-inactive";
+
+            return `
+            <tr>
+                <td>${item.id ?? ""}</td>
+                <td>${item.nome ?? ""}</td>
+                <td>${item.cognome ?? ""}</td>
+                <td>${item.qualifica ?? ""}</td>
+                <td>${cantiere}</td>
+                <td>${item.email ?? ""}</td>
+                <td><span class="${badgeClass}">${stato}</span></td>
+                <td>
+                    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                        <a class="btn" href="modifica-personale.html?id=${encodeURIComponent(item.id)}">Modifica</a>
+                        <a class="btn" href="assegna-cantiere.html?dipendenteId=${encodeURIComponent(item.id)}">Assegna Cantiere</a>
+                    </div>
+                </td>
+            </tr>
+        `;
+        }).join("");
+    }
+
+    document.getElementById("personaleFilter").addEventListener("input", loadPersonale);
+    document.getElementById("statoFilter").addEventListener("change", loadPersonale);
+
+    loadPersonale();
+</script>
+</body>
+</html>

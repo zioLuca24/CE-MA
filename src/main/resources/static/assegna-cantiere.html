@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Assegna Cantiere - Gestionale Edile</title>
+    <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<main class="page">
+    <section class="topbar">
+        <div>
+            <h1 class="title">Assegna cantiere</h1>
+            <div class="muted">Associa un dipendente a un cantiere attivo</div>
+        </div>
+        <button class="btn" onclick="signOut()">Logout</button>
+    </section>
+
+    <nav class="nav">
+        <a href="dashboard.html">Dashboard</a>
+        <a href="cantieri.html">Cantieri</a>
+        <a class="active" href="personale.html">Personale</a>
+        <a href="materiali.html">Materiali</a>
+        <a href="utenti.html">Utenze</a>
+        <a href="controllo-cantiere.html">Controllo Cantiere</a>
+    </nav>
+
+    <section class="card" style="padding:16px; max-width:900px; margin:0 auto;">
+        <div class="toolbar" style="margin-bottom:12px;">
+            <a class="btn" href="anagrafica-personale.html">Torna ad anagrafica personale</a>
+        </div>
+
+        <form id="assegnazioneForm" onsubmit="event.preventDefault(); salvaAssegnazione();">
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+                <div class="field">
+                    <label for="dipendenteSelect">Dipendente</label>
+                    <select id="dipendenteSelect" required style="border:1px solid var(--border);border-radius:12px;padding:10px;background:var(--bg-card-2);color:var(--text);">
+                        <option value="">Seleziona dipendente</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="cantiereSelect">Cantiere</label>
+                    <select id="cantiereSelect" required style="border:1px solid var(--border);border-radius:12px;padding:10px;background:var(--bg-card-2);color:var(--text);">
+                        <option value="">Seleziona cantiere</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="ruoloCantiere">Ruolo nel cantiere</label>
+                    <input id="ruoloCantiere" type="text" placeholder="es. Muratore, Impiantista">
+                </div>
+                <div class="field">
+                    <label for="statoAssegnazione">Stato assegnazione</label>
+                    <select id="statoAssegnazione" style="border:1px solid var(--border);border-radius:12px;padding:10px;background:var(--bg-card-2);color:var(--text);">
+                        <option value="ATTIVO">ATTIVO</option>
+                        <option value="IN SOSPESO">IN SOSPESO</option>
+                        <option value="COMPLETATO">COMPLETATO</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="dataInizio">Data inizio</label>
+                    <input id="dataInizio" type="date">
+                </div>
+                <div class="field">
+                    <label for="dataFine">Data fine</label>
+                    <input id="dataFine" type="date">
+                </div>
+            </div>
+
+            <div id="message" class="muted" style="margin-top:16px; min-height:24px;"></div>
+
+            <div class="toolbar" style="margin-top:18px; justify-content:flex-end;">
+                <button type="button" class="btn btn-secondary" onclick="window.location.href='anagrafica-personale.html'">Annulla</button>
+                <button type="submit" class="btn">Salva assegnazione</button>
+            </div>
+        </form>
+    </section>
+</main>
+
+<script src="assets/auth.js"></script>
+<script>
+    requireAuth();
+
+    const messageEl = document.getElementById("message");
+
+    function setMessage(text, isError = false) {
+        messageEl.textContent = text;
+        messageEl.style.color = isError ? "var(--danger, #dc2626)" : "var(--success, #15803d)";
+    }
+
+    async function loadDipendenti() {
+        const response = await fetch("/api/dipendenti");
+        const dipendenti = await response.json();
+        const select = document.getElementById("dipendenteSelect");
+        select.innerHTML = "<option value=''>Seleziona dipendente</option>" + dipendenti
+            .map(d => `<option value="${d.id}">${d.nome} ${d.cognome} - ${d.qualifica ?? ""}</option>`)
+            .join("");
+
+        const param = new URLSearchParams(window.location.search).get("dipendenteId");
+        if (param) {
+            select.value = param;
+        }
+    }
+
+    async function loadCantieri() {
+        const response = await fetch("/api/cantieri");
+        const cantieri = await response.json();
+        const select = document.getElementById("cantiereSelect");
+        select.innerHTML = "<option value=''>Seleziona cantiere</option>" + cantieri
+            .filter(c => ((c.stato || "").trim().toUpperCase() !== "ARCHIVIATO"))
+            .map(c => `<option value="${c.id}">${c.nome}</option>`)
+            .join("");
+    }
+
+    async function salvaAssegnazione() {
+        const dipendenteId = document.getElementById("dipendenteSelect").value;
+        const cantiereId = document.getElementById("cantiereSelect").value;
+
+        if (!dipendenteId || !cantiereId) {
+            setMessage("Dipendente e cantiere sono obbligatori.", true);
+            return;
+        }
+
+        const payload = {
+            dipendente: { id: Number(dipendenteId) },
+            cantiere: { id: Number(cantiereId) },
+            ruoloCantiere: document.getElementById("ruoloCantiere").value.trim() || "Operaio",
+            dataInizio: document.getElementById("dataInizio").value || null,
+            dataFine: document.getElementById("dataFine").value || null,
+            stato: document.getElementById("statoAssegnazione").value || "ATTIVO"
+        };
+
+        const response = await fetch("/api/assegnazioni", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            setMessage("Errore nel salvataggio dell’assegnazione: " + (errorText || response.statusText), true);
+            return;
+        }
+
+        setMessage("Assegnazione salvata correttamente.");
+        document.getElementById("assegnazioneForm").reset();
+        document.getElementById("statoAssegnazione").value = "ATTIVO";
+
+        setTimeout(() => {
+            window.location.href = "anagrafica-personale.html";
+        }, 800);
+    }
+
+    loadDipendenti();
+    loadCantieri();
+</script>
+</body>
+</html>

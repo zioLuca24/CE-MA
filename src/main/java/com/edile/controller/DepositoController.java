@@ -178,7 +178,7 @@ public class DepositoController {
                 (d.getQuantitaDisponibile() == null ? 0.0 : d.getQuantitaDisponibile()) - (d.getQuantitaUtilizzata() == null ? 0.0 : d.getQuantitaUtilizzata()),
                 d.getUbicazione(),
                 d.getPrezzoUnitario()
-        )).toList());
+        )).collect(java.util.stream.Collectors.toList()));
     }
 
     @Data

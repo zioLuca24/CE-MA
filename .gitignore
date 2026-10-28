@@ -1,0 +1,71 @@
+# Maven
+target/
+*.class
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+*.iml
+
+# Spring Boot
+.classpath
+.project
+.settings/
+bin/
+
+# Environment
+.env
+*.log
+
+# Database (local development only)
+*.db
+*.h2.db
+db/
+
+# Backups (local development)
+backups/
+*.tar.gz
+*.zip
+
+# OS
+.DS_Store
+Thumbs.db
+
+# NodeJS (if used for frontend build)
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Test coverage
+jacoco.xml
+coverage/
+
+# Gradle (if used)
+.gradle/
+build/
+
+# Maven wrapper
+.mvn/
+
+# JetBrains IDE cache
+*.iws
+
+# Maven generated files
+.checkstyle
+checkstyle-result.xml
+
+# Exclude local development files
+local.properties
+private.key
+*.pem

@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Turni Personale - Gestionale Edile</title>
+    <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<main class="page">
+    <section class="topbar">
+        <div>
+            <h1 class="title">Turni Personale</h1>
+            <div class="muted">Calendario dedicato per dipendente con cantiere associato</div>
+        </div>
+        <button class="btn" onclick="signOut()">Logout</button>
+    </section>
+
+    <nav class="nav">
+        <a href="dashboard.html">Dashboard</a>
+        <a href="cantieri.html">Cantieri</a>
+        <a class="active" href="personale.html">Personale</a>
+        <a href="materiali.html">Materiali</a>
+        <a href="utenti.html">Utenze</a>
+        <a href="controllo-cantiere.html">Controllo Cantiere</a>
+    </nav>
+
+    <nav class="subnav">
+        <a href="anagrafica-personale.html">Anagrafica Personale</a>
+        <a class="active" href="turni-personale.html">Turni Personale</a>
+    </nav>
+
+    <section class="card" style="padding: 16px;">
+        <div class="toolbar" style="align-items:end; flex-wrap:wrap;">
+            <div class="field" style="margin:0; min-width:280px;">
+                <label for="dipendenteSelect">Dipendente</label>
+                <select id="dipendenteSelect" style="border:1px solid var(--border);border-radius:12px;padding:10px;background:var(--bg-card-2);color:var(--text);">
+                    <option value="">Seleziona dipendente</option>
+                </select>
+            </div>
+            <div class="field" style="margin:0; min-width:190px;">
+                <label for="meseInput">Mese</label>
+                <input id="meseInput" type="month">
+            </div>
+            <button class="btn" onclick="renderCalendar()">Carica calendario</button>
+        </div>
+
+        <div id="summaryBox" class="card" style="display:none; padding:12px 14px; margin: 16px 0; background: var(--bg-card-2); border:1px solid var(--border); border-radius:12px;">
+            <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+                <div><strong>Totale ore mese:</strong> <span id="totaleOre">0</span> h</div>
+                <div><strong>Cantiere attivo:</strong> <span id="cantiereAttivo">N/D</span></div>
+                <div><strong>Stato:</strong> <span id="statoDipendente">N/D</span></div>
+            </div>
+        </div>
+
+        <div id="calendarEmpty" class="empty">Seleziona un dipendente per visualizzare il calendario turni.</div>
+        <div id="calendarWrap" style="display:none;">
+            <div id="calendarHeader" class="muted" style="margin-bottom:10px;"></div>
+            <div id="calendarGrid" class="calendar-grid"></div>
+        </div>
+    </section>
+</main>
+
+<script src="assets/auth.js"></script>
+<script>
+    requireAuth();
+
+    const weekLabels = ["Lun", "Mar", "Mer", "Gio", "Ven", "Sab", "Dom"];
+    let currentDipendenti = [];
+
+    async function loadDipendenti() {
+        const response = await fetch("/api/dipendenti");
+        currentDipendenti = await response.json();
+        const select = document.getElementById("dipendenteSelect");
+        select.innerHTML = "<option value=''>Seleziona dipendente</option>" +
+            currentDipendenti.map(d => `<option value="${d.id}">${d.nome} ${d.cognome}</option>`).join("");
+    }
+
+    async function renderCalendar() {
+        const dipendenteId = document.getElementById("dipendenteSelect").value;
+        const monthValue = document.getElementById("meseInput").value;
+        const empty = document.getElementById("calendarEmpty");
+        const wrap = document.getElementById("calendarWrap");
+        const grid = document.getElementById("calendarGrid");
+        const header = document.getElementById("calendarHeader");
+        const summaryBox = document.getElementById("summaryBox");
+        const totaleOreEl = document.getElementById("totaleOre");
+        const cantiereAttivoEl = document.getElementById("cantiereAttivo");
+        const statoDipendenteEl = document.getElementById("statoDipendente");
+
+        if (!dipendenteId || !monthValue) {
+            wrap.style.display = "none";
+            summaryBox.style.display = "none";
+            empty.style.display = "block";
+            empty.textContent = "Seleziona dipendente e mese per visualizzare i turni.";
+            return;
+        }
+
+        const dipendente = currentDipendenti.find(d => String(d.id) === String(dipendenteId));
+        const response = await fetch("/api/turni/dipendente/" + encodeURIComponent(dipendenteId));
+        const allTurni = await response.json();
+        const turni = allTurni.filter(t => (t.data || "").startsWith(monthValue));
+
+        const totaleOre = turni.reduce((sum, turno) => {
+            if (!turno.oraInizio || !turno.oraFine) return sum;
+            const [hhIn, mmIn] = (turno.oraInizio || "00:00").split(":").map(Number);
+            const [hhOut, mmOut] = (turno.oraFine || "00:00").split(":").map(Number);
+            const minuti = (hhOut * 60 + mmOut) - (hhIn * 60 + mmIn);
+            return sum + (minuti > 0 ? minuti / 60 : 0);
+        }, 0);
+
+        const assegnazioniResponse = await fetch("/api/assegnazioni/dipendente/" + encodeURIComponent(dipendenteId));
+        const assegnazioni = await assegnazioniResponse.json();
+        const ultimaAssegnazione = (assegnazioni || []).slice().reverse().find(a => a.cantiere && a.cantiere.nome);
+        cantiereAttivoEl.textContent = ultimaAssegnazione && ultimaAssegnazione.cantiere ? ultimaAssegnazione.cantiere.nome : "N/D";
+        statoDipendenteEl.textContent = dipendente && dipendente.stato ? dipendente.stato : "N/D";
+        totaleOreEl.textContent = totaleOre.toFixed(2);
+        summaryBox.style.display = "block";
+
+        const date = new Date(monthValue + "-01T00:00:00");
+        const year = date.getFullYear();
+        const month = date.getMonth();
+        const firstDay = new Date(year, month, 1);
+        const lastDay = new Date(year, month + 1, 0);
+        const firstWeekday = (firstDay.getDay() + 6) % 7;
+        const daysInMonth = lastDay.getDate();
+
+        const byDate = {};
+        turni.forEach(t => {
+            if (!t.data) return;
+            if (!byDate[t.data]) byDate[t.data] = [];
+            byDate[t.data].push(t);
+        });
+
+        const cells = [];
+        weekLabels.forEach(label => {
+            cells.push(`<div class="calendar-day muted-day"><div class="calendar-day-number">${label}</div></div>`);
+        });
+
+        for (let i = 0; i < firstWeekday; i++) {
+            cells.push(`<div class="calendar-day muted-day"></div>`);
+        }
+
+        for (let day = 1; day <= daysInMonth; day++) {
+            const d = String(day).padStart(2, "0");
+            const m = String(month + 1).padStart(2, "0");
+            const key = `${year}-${m}-${d}`;
+            const entries = (byDate[key] || []).map(t => {
+                const oraInizio = t.oraInizio || "--:--";
+                const oraFine = t.oraFine || "--:--";
+                const cantiere = t.cantiere && t.cantiere.nome ? t.cantiere.nome : "N/D";
+                return `<div class="calendar-entry"><strong>${oraInizio} - ${oraFine}</strong><br>${cantiere}</div>`;
+            }).join("");
+            cells.push(`
+                <div class="calendar-day">
+                    <div class="calendar-day-number">${day}</div>
+                    ${entries}
+                </div>
+            `);
+        }
+
+        grid.innerHTML = cells.join("");
+        header.textContent = `${dipendente ? dipendente.nome + " " + dipendente.cognome : ""} — ${monthValue}`;
+        empty.style.display = turni.length ? "none" : "block";
+        empty.textContent = turni.length ? "" : "Nessun turno registrato nel mese selezionato.";
+        wrap.style.display = "block";
+    }
+
+    function initMonth() {
+        const today = new Date();
+        const month = String(today.getMonth() + 1).padStart(2, "0");
+        document.getElementById("meseInput").value = `${today.getFullYear()}-${month}`;
+    }
+
+    initMonth();
+    loadDipendenti();
+</script>
+</body>
+</html>

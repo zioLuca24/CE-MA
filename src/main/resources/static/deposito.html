@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deposito Materiali - Gestionale Edile</title>
+    <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<main class="page">
+    <section class="topbar">
+        <div>
+            <h1 class="title">Deposito Materiali</h1>
+            <div class="muted">Gestione attrezzature e materiali in stock</div>
+        </div>
+        <button class="btn" onclick="signOut()">Logout</button>
+    </section>
+
+    <nav class="nav">
+        <a href="dashboard.html">Dashboard</a>
+        <a href="cantieri.html">Cantieri</a>
+        <a href="personale.html">Personale</a>
+        <a href="materiali.html">Materiali</a>
+        <a href="utenti.html">Utenze</a>
+        <a class="active" href="deposito.html">Deposito</a>
+        <a href="controllo-cantiere.html">Controllo Cantiere</a>
+    </nav>
+
+    <section class="card" style="padding: 16px; margin-bottom: 16px;">
+        <div style="display: flex; gap: 12px; margin-bottom: 16px;">
+            <button class="btn" onclick="showAggiungiArticolo()">+ Aggiungi articolo</button>
+            <button class="btn" onclick="showPrelievo()">Prelievo dal deposito</button>
+        </div>
+        <div id="formContainer" class="empty" style="display: none; margin-bottom: 16px;">
+            <div class="field">
+                <label for="newNome">Nome articolo *</label>
+                <input id="newNome" type="text" placeholder="es. Pala" style="border:1px solid var(--border);border-radius:12px;padding:8px;">
+            </div>
+            <div class="field">
+                <label for="newCategoria">Categoria</label>
+                <input id="newCategoria" type="text" placeholder="es. Attrezzi, Macchine" style="border:1px solid var(--border);border-radius:12px;padding:8px;">
+            </div>
+            <div class="field">
+                <label for="newQuantita">Quantità *</label>
+                <input id="newQuantita" type="number" step="1" min="1" placeholder="0" style="border:1px solid var(--border);border-radius:12px;padding:8px;">
+            </div>
+            <div class="field">
+                <label for="newUbicazione">Ubicazione</label>
+                <input id="newUbicazione" type="text" placeholder="es. Scaffale A1" style="border:1px solid var(--border);border-radius:12px;padding:8px;">
+            </div>
+            <div class="field">
+                <label for="newNote">Note</label>
+                <textarea id="newNote" placeholder="Note aggiuntive" style="border:1px solid var(--border);border-radius:12px;padding:8px;"></textarea>
+            </div>
+            <button class="btn" onclick="salvaArticolo()">Salva</button>
+            <button class="btn" style="background: var(--text-muted);" onclick="nascondiForm()">Annulla</button>
+        </div>
+        <div id="prelieviContainer" class="empty" style="display: none; margin-bottom: 16px;">
+            <div class="field">
+                <label for="articoloSelect">Articolo</label>
+                <select id="articoloSelect" style="border:1px solid var(--border);border-radius:12px;padding:10px;background:var(--bg-card-2);color:var(--text);">
+                    <option value="">Seleziona articolo</option>
+                </select>
+            </div>
+            <div class="field">
+                <label for="cantiereSelect">Cantiere (opzionale)</label>
+                <select id="cantiereSelect" style="border:1px solid var(--border);border-radius:12px;padding:10px;background:var(--bg-card-2);color:var(--text);">
+                    <option value="">Seleziona cantiere</option>
+                </select>
+            </div>
+            <div class="field">
+                <label for="quantitaPrelievo">Quantità</label>
+                <input id="quantitaPrelievo" type="number" step="1" min="1" placeholder="0" style="border:1px solid var(--border);border-radius:12px;padding:8px;">
+            </div>
+            <div class="field">
+                <label for="notePrelievo">Note</label>
+                <textarea id="notePrelievo" placeholder="Note movimentazione" style="border:1px solid var(--border);border-radius:12px;padding:8px;"></textarea>
+            </div>
+            <button class="btn" onclick="salvaPrelievo()">Salva prelievo</button>
+            <button class="btn" style="background: var(--text-muted);" onclick="nascondiForm()">Annulla</button>
+        </div>
+    </section>
+
+    <section class="card" style="padding: 16px; margin-bottom: 16px;">
+        <div class="toolbar">
+            <strong>Disponibilità in deposito</strong>
+            <button class="btn" onclick="loadDisponibilita()">Aggiorna</button>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                <tr>
+                    <th>Codice</th>
+                    <th>Nome articolo</th>
+                    <th>Descrizione</th>
+                    <th>Categoria</th>
+                    <th>U.M.</th>
+                    <th>Disponibile</th>
+                    <th>Utilizzata</th>
+                    <th>Residua</th>
+                    <th>Ubicazione</th>
+                </tr>
+                </thead>
+                <tbody id="disponibilitaRows"></tbody>
+            </table>
+            <div id="emptyDisponibilita" class="empty" style="display:none;">Nessun articolo in deposito.</div>
+        </div>
+    </section>
+
+    <section class="card" style="padding: 16px;">
+        <div class="toolbar">
+            <strong>Storico movimenti</strong>
+            <button class="btn" onclick="loadMovimenti()">Aggiorna</button>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                <tr>
+                    <th>Data</th>
+                    <th>Tipo</th>
+                    <th>Articolo</th>
+                    <th>Quantità</th>
+                    <th>Cantiere</th>
+                    <th>Dipendente</th>
+                    <th>Note</th>
+                </tr>
+                </thead>
+                <tbody id="movimentiRows"></tbody>
+            </table>
+            <div id="emptyMovimenti" class="empty" style="display:none;">Nessun movimento registrato.</div>
+        </div>
+    </section>
+</main>
+
+<script src="assets/auth.js"></script>
+<script>
+    requireAuth();
+
+    const params = new URLSearchParams(window.location.search);
+    const cantiereId = params.get("cantiereId");
+    let currentMode = null;
+
+    function n(value) {
+        if (value === null || value === undefined) return "0";
+        return new Intl.NumberFormat("it-IT", { maximumFractionDigits: 2 }).format(value);
+    }
+
+    function d(dateStr) {
+        if (!dateStr) return "";
+        const date = new Date(dateStr);
+        return date.toLocaleDateString("it-IT");
+    }
+
+    function esc(value) {
+        return String(value ?? "")
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll("\"", "&quot;")
+            .replaceAll("'", "&#39;");
+    }
+
+    async function messaggioErrore(response, fallback) {
+        try {
+            const payload = await response.json();
+            if (typeof payload === "string") return payload;
+            return payload.message || payload.error || fallback;
+        } catch (e) {
+            return fallback;
+        }
+    }
+
+    function showAggiungiArticolo() {
+        currentMode = "aggiungi";
+        document.getElementById("formContainer").style.display = "block";
+        document.getElementById("prelieviContainer").style.display = "none";
+        document.getElementById("newNome").focus();
+    }
+
+    function showPrelievo() {
+        currentMode = "prelievo";
+        document.getElementById("formContainer").style.display = "none";
+        document.getElementById("prelieviContainer").style.display = "block";
+        loadArticoliForSelect();
+        loadCantieriForSelect();
+    }
+
+    function nascondiForm() {
+        document.getElementById("formContainer").style.display = "none";
+        document.getElementById("prelieviContainer").style.display = "none";
+        currentMode = null;
+    }
+
+    async function salvaArticolo() {
+        const nome = document.getElementById("newNome").value.trim();
+        const categoria = document.getElementById("newCategoria").value.trim();
+        const quantita = parseInt(document.getElementById("newQuantita").value, 10);
+        const ubicazione = document.getElementById("newUbicazione").value.trim();
+        const note = document.getElementById("newNote").value.trim();
+
+        if (!nome) {
+            alert("Il Nome Articolo è obbligatorio");
+            return;
+        }
+        if (isNaN(quantita) || !Number.isInteger(quantita) || quantita <= 0) {
+            alert("La Quantità è obbligatoria e deve essere un numero intero maggiore di zero");
+            return;
+        }
+
+        const payload = {
+            nomeArticolo: nome,
+            categoria: categoria,
+            quantitaDisponibile: quantita,
+            quantitaUtilizzata: 0,
+            ubicazione: ubicazione,
+            note: note
+        };
+
+        const response = await fetch("/api/deposito", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+        if (!response.ok) {
+            alert(await messaggioErrore(response, "Errore nel salvataggio dell'articolo."));
+            return;
+        }
+
+        document.getElementById("newNome").value = "";
+        document.getElementById("newCategoria").value = "";
+        document.getElementById("newQuantita").value = "";
+        document.getElementById("newUbicazione").value = "";
+        document.getElementById("newNote").value = "";
+        nascondiForm();
+        loadDisponibilita();
+    }
+
+    async function salvaPrelievo() {
+        const depositoId = document.getElementById("articoloSelect").value;
+        const cantiereSelezionato = document.getElementById("cantiereSelect").value || cantiereId;
+        const quantita = parseInt(document.getElementById("quantitaPrelievo").value, 10);
+        const note = document.getElementById("notePrelievo").value.trim();
+
+        if (!depositoId || isNaN(quantita) || !Number.isInteger(quantita) || quantita <= 0) {
+            alert("Seleziona un articolo e inserisci una quantità intera valida");
+            return;
+        }
+
+        const payload = {
+            depositoId: parseInt(depositoId),
+            cantiereId: cantiereSelezionato ? parseInt(cantiereSelezionato) : null,
+            tipoMovimento: "PRELIEVO",
+            quantita: quantita,
+            note: note
+        };
+
+        const response = await fetch("/api/deposito/movimenti", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+        if (!response.ok) {
+            alert(await messaggioErrore(response, "Errore nel salvataggio del movimento."));
+            return;
+        }
+
+        document.getElementById("articoloSelect").value = "";
+        document.getElementById("cantiereSelect").value = "";
+        document.getElementById("quantitaPrelievo").value = "";
+        document.getElementById("notePrelievo").value = "";
+        nascondiForm();
+        loadDisponibilita();
+        loadMovimenti();
+    }
+
+    async function loadArticoliForSelect() {
+        const select = document.getElementById("articoloSelect");
+        const response = await fetch("/api/deposito/disponibilita");
+        if (!response.ok) {
+            select.innerHTML = "<option value=''>Nessun articolo disponibile</option>";
+            return;
+        }
+        const data = await response.json();
+        select.innerHTML = "<option value=''>Seleziona articolo</option>" +
+            (data || []).map(a => `<option value="${a.id}">${esc(a.nomeArticolo)} (residuo ${n(a.quantitaResidua)})</option>`).join("");
+    }
+
+    async function loadCantieriForSelect() {
+        const select = document.getElementById("cantiereSelect");
+        const response = await fetch("/api/cantieri");
+        if (!response.ok) {
+            select.innerHTML = "<option value=''>Seleziona cantiere</option>";
+            return;
+        }
+        const data = await response.json();
+        const options = (data || []).map(c => `<option value="${c.id}">${esc(c.nome)}</option>`).join("");
+        select.innerHTML = "<option value=''>Seleziona cantiere</option>" + options;
+        if (cantiereId) {
+            select.value = String(cantiereId);
+        }
+    }
+
+    async function loadDisponibilita() {
+        const rows = document.getElementById("disponibilitaRows");
+        const empty = document.getElementById("emptyDisponibilita");
+        const response = await fetch("/api/deposito/disponibilita");
+        if (!response.ok) {
+            rows.innerHTML = "";
+            empty.style.display = "block";
+            empty.textContent = "Errore nel caricamento della disponibilità.";
+            return;
+        }
+        const data = await response.json();
+
+        if (!data || !data.length) {
+            rows.innerHTML = "";
+            empty.style.display = "block";
+            empty.textContent = "Nessun articolo in deposito.";
+            return;
+        }
+        empty.style.display = "none";
+
+        rows.innerHTML = data.map(item => `
+            <tr>
+                <td>${esc(item.codiceArticolo)}</td>
+                <td>${esc(item.nomeArticolo)}</td>
+                <td>${esc(item.descrizione)}</td>
+                <td>${esc(item.categoria)}</td>
+                <td>${esc(item.unitaMisura)}</td>
+                <td>${n(item.quantitaDisponibile)}</td>
+                <td>${n(item.quantitaUtilizzata)}</td>
+                <td>${n(item.quantitaResidua)}</td>
+                <td>${esc(item.ubicazione)}</td>
+            </tr>
+        `).join("");
+    }
+
+    async function loadMovimenti() {
+        const rows = document.getElementById("movimentiRows");
+        const empty = document.getElementById("emptyMovimenti");
+        const response = await fetch("/api/deposito/movimenti");
+        if (!response.ok) {
+            rows.innerHTML = "";
+            empty.style.display = "block";
+            empty.textContent = "Errore nel caricamento dei movimenti.";
+            return;
+        }
+        const data = await response.json();
+
+        if (!data || !data.length) {
+            rows.innerHTML = "";
+            empty.style.display = "block";
+            empty.textContent = "Nessun movimento registrato.";
+            return;
+        }
+        empty.style.display = "none";
+
+        rows.innerHTML = data.map(item => `
+            <tr>
+                <td>${d(item.dataMovimento)}</td>
+                <td>${esc(item.tipoMovimento)}</td>
+                <td>${item.deposito ? esc(item.deposito.nomeArticolo) : ""}</td>
+                <td>${n(item.quantita)}</td>
+                <td>${item.cantiere ? esc(item.cantiere.nome) : ""}</td>
+                <td>${item.dipendente ? esc(item.dipendente.nome + " " + item.dipendente.cognome) : ""}</td>
+                <td>${esc(item.note)}</td>
+            </tr>
+        `).join("");
+    }
+
+    loadDisponibilita();
+    loadMovimenti();
+</script>
+</body>
+</html>

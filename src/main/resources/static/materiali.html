@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Materiali - Gestionale Edile</title>
+    <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<main class="page">
+    <section class="topbar">
+        <div>
+            <h1 class="title">Materiali</h1>
+            <div class="muted">Menu materiali con sottomoduli operativi</div>
+        </div>
+        <button class="btn" onclick="signOut()">Logout</button>
+    </section>
+
+    <nav class="nav">
+        <a href="dashboard.html">Dashboard</a>
+        <a href="cantieri.html">Cantieri</a>
+        <a href="personale.html">Personale</a>
+        <a class="active" href="materiali.html">Materiali</a>
+        <a href="utenti.html">Utenze</a>
+        <a href="controllo-cantiere.html">Controllo Cantiere</a>
+    </nav>
+
+    <section class="card" style="padding: 18px;">
+        <div class="toolbar">
+            <h2 style="margin: 0;">Sottomenu Materiali</h2>
+            <span class="chip">3 moduli</span>
+        </div>
+        <div class="actions-grid">
+            <article class="action-card">
+                <h3>Anagrafica Materiali</h3>
+                <p>Vista quantità acquistata, utilizzata e residua con filtro cantiere.</p>
+                <a class="action-link" href="anagrafica-materiali.html">Apri anagrafica →</a>
+            </article>
+            <article class="action-card">
+                <h3>Carica Bolla Materiali</h3>
+                <p>Importa PDF/JPG della bolla e aggiorna automaticamente l'anagrafica.</p>
+                <a class="action-link" href="carica-bolla-materiali.html">Apri carica bolla →</a>
+            </article>
+            <article class="action-card">
+                <h3>Anagrafica Fornitori</h3>
+                <p>Vista fornitori alimentata direttamente dalle bolle con materiale e prezzo unitario.</p>
+                <a class="action-link" href="anagrafica-fornitori.html">Apri anagrafica fornitori →</a>
+            </article>
+        </div>
+    </section>
+</main>
+
+<script src="assets/auth.js"></script>
+<script>
+    requireAuth();
+</script>
+</body>
+</html>

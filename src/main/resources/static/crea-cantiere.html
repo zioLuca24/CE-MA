@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crea Nuovo Cantiere</title>
+    <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<main class="page">
+    <section class="topbar">
+        <div>
+            <h1 class="title">Crea Nuovo Cantiere</h1>
+            <div class="muted">Compila i campi per registrare un nuovo cantiere.</div>
+        </div>
+        <button class="btn" onclick="signOut()">Logout</button>
+    </section>
+
+    <nav class="nav">
+        <a href="dashboard.html">Dashboard</a>
+        <a class="active" href="cantieri.html">Cantieri</a>
+        <a href="personale.html">Personale</a>
+        <a href="materiali.html">Materiali</a>
+        <a href="utenti.html">Utenze</a>
+        <a href="controllo-cantiere.html">Controllo Cantiere</a>
+    </nav>
+
+    <section class="card" style="padding: 32px; max-width: 600px; margin: 0 auto;">
+        <form id="formCantiere" onsubmit="salvaCantiere(event)">
+            <div style="margin-bottom: 20px;">
+                <label for="nome"><strong>Nome Cantiere *</strong></label>
+                <input type="text" id="nome" name="nome" placeholder="Es: Cantiere Milano Centro" required style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <label for="indirizzo"><strong>Indirizzo *</strong></label>
+                <input type="text" id="indirizzo" name="indirizzo" placeholder="Es: Via Roma 42, Milano" required style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <label for="responsabile"><strong>Responsabile</strong></label>
+                <input type="text" id="responsabile" name="responsabile" placeholder="Nome del responsabile" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <label for="budget"><strong>Budget (€)</strong></label>
+                <input type="number" id="budget" name="budget" placeholder="Es: 50000" step="0.01" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <label for="stato"><strong>Stato *</strong></label>
+                <select id="stato" name="stato" required style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+                    <option value="">-- Seleziona --</option>
+                    <option value="PIANIFICATO">Pianificato</option>
+                    <option value="ATTIVO">Attivo</option>
+                    <option value="IN CORSO">In Corso</option>
+                    <option value="COMPLETATO">Completato</option>
+                    <option value="SOSPESO">Sospeso</option>
+                </select>
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <label for="dataInizio"><strong>Data Inizio</strong></label>
+                <input type="date" id="dataInizio" name="dataInizio" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+            </div>
+
+            <div style="display: flex; gap: 10px; justify-content: space-between; margin-top: 30px;">
+                <button type="button" class="btn" onclick="window.history.back()" style="flex: 1;">Annulla</button>
+                <button type="submit" class="btn" style="flex: 1; background-color: #28a745;">Salva Cantiere</button>
+            </div>
+        </form>
+    </section>
+</main>
+
+<script src="assets/auth.js"></script>
+<script>
+    requireAuth();
+
+    async function salvaCantiere(event) {
+        event.preventDefault();  // previene il reload della pagina
+
+        const nuovoCantiere = {
+            nome: document.getElementById("nome").value,
+            indirizzo: document.getElementById("indirizzo").value,
+            responsabile: document.getElementById("responsabile").value,
+            budget: document.getElementById("budget").value ? parseFloat(document.getElementById("budget").value) : null,
+            stato: document.getElementById("stato").value,
+            dataInizio: document.getElementById("dataInizio").value
+        };
+
+        try {
+            const response = await fetch("/api/cantieri", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(nuovoCantiere)
+            });
+
+            if (response.ok) {
+                alert("Cantiere creato con successo!");
+                window.location.href = "cantieri.html?created=" + Date.now();  // torna alla lista aggiornata
+            } else {
+                alert("Errore nella creazione del cantiere!");
+            }
+        } catch (error) {
+            alert("Errore: " + error);
+        }
+    }
+</script>
+</body>
+</html>

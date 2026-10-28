@@ -19,6 +19,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/deposito")
@@ -178,7 +179,7 @@ public class DepositoController {
                 (d.getQuantitaDisponibile() == null ? 0.0 : d.getQuantitaDisponibile()) - (d.getQuantitaUtilizzata() == null ? 0.0 : d.getQuantitaUtilizzata()),
                 d.getUbicazione(),
                 d.getPrezzoUnitario()
-        )).toList());
+        )).collect(Collectors.toList()));
     }
 
     @Data

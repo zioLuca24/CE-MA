@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Carica Bolla Materiali - Gestionale Edile</title>
+    <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<main class="page">
+    <section class="topbar">
+        <div>
+            <h1 class="title">Carica Bolla Materiali</h1>
+            <div class="muted">Importa PDF/JPG e aggiorna automaticamente l'anagrafica</div>
+        </div>
+        <button class="btn" onclick="signOut()">Logout</button>
+    </section>
+
+    <nav class="nav">
+        <a href="dashboard.html">Dashboard</a>
+        <a href="cantieri.html">Cantieri</a>
+        <a href="personale.html">Personale</a>
+        <a class="active" href="materiali.html">Materiali</a>
+        <a href="utenti.html">Utenze</a>
+        <a href="controllo-cantiere.html">Controllo Cantiere</a>
+    </nav>
+
+    <nav class="subnav">
+        <a href="anagrafica-materiali.html">Anagrafica Materiali</a>
+        <a href="anagrafica-fornitori.html">Anagrafica Fornitori</a>
+        <a class="active" href="carica-bolla-materiali.html">Carica Bolla Materiali</a>
+    </nav>
+
+    <section class="card" style="padding: 16px; margin-bottom: 16px;">
+        <div class="field">
+            <label for="cantiereSelect">Cantiere destinazione</label>
+            <select id="cantiereSelect" style="border:1px solid var(--border);border-radius:12px;padding:10px;background:var(--bg-card-2);color:var(--text);">
+                <option value="">Seleziona cantiere</option>
+            </select>
+        </div>
+        <div class="field">
+            <label for="fornitoreInput">Fornitore</label>
+            <input id="fornitoreInput" type="text" placeholder="Inserisci manualmente il nome del fornitore"
+                   style="border:1px solid var(--border);border-radius:12px;padding:10px;background:var(--bg-card-2);color:var(--text);">
+        </div>
+        <div class="field">
+            <label for="allegatoFile">Allegato PDF/JPG</label>
+            <input id="allegatoFile" type="file" accept=".pdf,.jpg,.jpeg,.png"
+                   style="border:1px solid var(--border);border-radius:12px;padding:8px;background:var(--bg-card-2);color:var(--text);">
+        </div>
+        <button class="btn" onclick="importaBolla()">Importa bolla</button>
+        <div id="importMessage" class="muted" style="margin-top:10px;"></div>
+        <div class="muted" style="margin-top:12px;">
+            Il riconoscimento automatico del fornitore e' temporaneamente disattivato: inseriscilo manualmente qui sopra.
+        </div>
+    </section>
+
+    <section class="card" style="padding: 16px; margin-bottom:16px;">
+        <div class="toolbar">
+            <strong>Storico bolle importate</strong>
+            <button class="btn" onclick="loadBolle()">Aggiorna</button>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                <tr>
+                    <th>Numero bolla</th>
+                    <th>Codice articolo</th>
+                    <th>Descrizione</th>
+                    <th>Fornitore</th>
+                    <th>QuantitÃ </th>
+                    <th>Prezzo unitario</th>
+                    <th>Prezzo totale</th>
+                    <th>Cantiere</th>
+                </tr>
+                </thead>
+                <tbody id="rows"></tbody>
+            </table>
+            <div id="empty" class="empty" style="display:none;">Nessuna bolla importata.</div>
+        </div>
+    </section>
+
+</main>
+
+<script src="assets/auth.js"></script>
+<script>
+    requireAuth();
+
+    function n(value) {
+        if (value === null || value === undefined) return "0";
+        return new Intl.NumberFormat("it-IT", { maximumFractionDigits: 2 }).format(value);
+    }
+
+    async function loadCantieri() {
+        const select = document.getElementById("cantiereSelect");
+        const response = await fetch("/api/cantieri");
+        if (!response.ok) {
+            return;
+        }
+        const data = await response.json();
+        select.innerHTML = "<option value=''>Seleziona cantiere</option>" +
+            (data || []).map(c => `<option value="${c.id}">${c.nome}</option>`).join("");
+    }
+
+    async function importaBolla() {
+        const fileInput = document.getElementById("allegatoFile");
+        const cantiereSelect = document.getElementById("cantiereSelect");
+        const message = document.getElementById("importMessage");
+
+        if (!cantiereSelect.value) {
+            message.textContent = "Seleziona prima il cantiere di destinazione.";
+            return;
+        }
+        if (!fileInput.files.length) {
+            message.textContent = "Seleziona un PDF, JPG o PNG.";
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append("file", fileInput.files[0]);
+        formData.append("cantiereId", cantiereSelect.value);
+
+        const fornitoreInput = document.getElementById("fornitoreInput").value.trim();
+        if (fornitoreInput) {
+            formData.append("fornitoreNome", fornitoreInput);
+        }
+
+        const response = await fetch("/api/materiali/bolle/importa", { method: "POST", body: formData });
+        const payload = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+            message.textContent = "Errore: " + (payload.message || "importazione non riuscita.");
+            return;
+        }
+
+        const errori = payload.errori && payload.errori.length ? ` Errori: ${payload.errori.join(" | ")}` : "";
+        message.textContent = `Import completato: ${payload.righeImportate} righe.` + errori;
+        fileInput.value = "";
+        await loadBolle();
+    }
+
+    async function loadBolle() {
+        const rows = document.getElementById("rows");
+        const empty = document.getElementById("empty");
+        const response = await fetch("/api/materiali/bolle");
+        const data = await response.json();
+
+        if (!data.length) {
+            rows.innerHTML = "";
+            empty.style.display = "block";
+            return;
+        }
+        empty.style.display = "none";
+
+        rows.innerHTML = data.map(item => `
+            <tr>
+                <td>${item.numeroBolla ?? ""}</td>
+                <td>${item.codiceArticolo ?? ""}</td>
+                <td>${item.descrizione ?? (item.materiale ? item.materiale.nome : "")}</td>
+                <td>${item.fornitoreNome ?? ""}</td>
+                <td>${n(item.quantita)}</td>
+                <td>${n(item.prezzoUnitario)}</td>
+                <td>${n(item.prezzoTotale)}</td>
+                <td>${item.cantiere ? item.cantiere.nome : ""}</td>
+            </tr>
+        `).join("");
+    }
+
+    loadCantieri();
+    loadBolle();
+</script>
+</body>
+</html>

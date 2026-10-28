@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controllo Cantiere - Gestionale Edile</title>
+    <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<main class="page">
+    <section class="topbar">
+        <div>
+            <h1 class="title">Controllo Cantiere</h1>
+            <div class="muted">KPI, forecast e report essenziali per ridurre sprechi</div>
+        </div>
+        <button class="btn" onclick="signOut()">Logout</button>
+    </section>
+
+    <nav class="nav">
+        <a href="dashboard.html">Dashboard</a>
+        <a href="cantieri.html">Cantieri</a>
+        <a href="personale.html">Personale</a>
+        <a href="materiali.html">Materiali</a>
+        <a href="utenti.html">Utenze</a>
+        <a class="active" href="controllo-cantiere.html">Controllo Cantiere</a>
+    </nav>
+
+    <nav class="subnav">
+        <a href="analisi-sprechi.html">Soglie e Alert</a>
+        <a href="kpi-cantiere.html">KPI Cantiere</a>
+        <a href="forecast-fabbisogni.html">Forecast Fabbisogni</a>
+        <a href="report-essenziali.html">Report Essenziali</a>
+    </nav>
+
+    <section class="card" style="padding: 18px;">
+        <div class="toolbar">
+            <h2 style="margin: 0;">Sottomenu Controllo Cantiere</h2>
+            <span class="chip">4 moduli</span>
+        </div>
+        <div class="actions-grid">
+            <article class="action-card">
+                <h3>Soglie e Alert Sprechi</h3>
+                <p>Imposta soglie materiali e ricevi alert automatici su scorte e consumi.</p>
+                <a class="action-link" href="analisi-sprechi.html">Apri soglie e alert →</a>
+            </article>
+            <article class="action-card">
+                <h3>KPI Cantiere</h3>
+                <p>Scostamento materiali previsto vs usato per singolo cantiere.</p>
+                <a class="action-link" href="kpi-cantiere.html">Apri KPI cantiere →</a>
+            </article>
+            <article class="action-card">
+                <h3>Forecast Fabbisogni</h3>
+                <p>Previsione consumi e riordino suggerito in base a giacenze minime.</p>
+                <a class="action-link" href="forecast-fabbisogni.html">Apri forecast fabbisogni →</a>
+            </article>
+            <article class="action-card">
+                <h3>Report Essenziali</h3>
+                <p>Consumi del mese, scostamento per cantiere ed export CSV.</p>
+                <a class="action-link" href="report-essenziali.html">Apri report essenziali →</a>
+            </article>
+        </div>
+    </section>
+</main>
+
+<script src="assets/auth.js"></script>
+<script>
+    requireAuth();
+</script>
+</body>
+</html>

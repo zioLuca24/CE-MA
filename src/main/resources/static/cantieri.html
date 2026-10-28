@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anagrafica Cantieri - Gestionale Edile</title>
+    <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<main class="page">
+    <section class="topbar">
+        <div>
+            <h1 class="title">Anagrafica Cantieri</h1>
+            <div class="muted">Elenco cantieri attivi. Le operazioni amministrative sono nella pagina dedicata.</div>
+        </div>
+        <button class="btn" onclick="signOut()">Logout</button>
+    </section>
+
+    <nav class="nav">
+        <a href="dashboard.html">Dashboard</a>
+        <a class="active" href="cantieri.html">Cantieri</a>
+        <a href="personale.html">Personale</a>
+        <a href="materiali.html">Materiali</a>
+        <a href="utenti.html">Utenze</a>
+        <a href="controllo-cantiere.html">Controllo Cantiere</a>
+    </nav>
+
+    <section class="card" style="padding: 16px;">
+        <div class="toolbar">
+            <strong>Totale cantieri: <span id="totalCount">0</span></strong>
+            <button class="btn" onclick="loadCantieri()">Aggiorna</button>
+            <button class="btn" onclick="window.location.href='crea-cantiere.html'">Crea nuovo cantiere</button>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Nome</th>
+                    <th>Indirizzo</th>
+                    <th>Responsabile</th>
+                    <th>Budget</th>
+                    <th>Stato</th>
+                    <th>Operazioni</th>
+                </tr>
+                </thead>
+                <tbody id="rows"></tbody>
+            </table>
+            <div id="empty" class="empty" style="display:none;">Nessun cantiere attivo disponibile.</div>
+        </div>
+        <div class="toolbar" style="margin-top:15px;">
+            <button class="btn" onclick="window.location.href='vis-cantiere.html'">Visualizza Cantieri Archiviati</button>
+        </div>
+    </section>
+</main>
+
+<script src="assets/auth.js"></script>
+<script>
+    requireAuth();
+
+    function euro(value) {
+        if (value === null || value === undefined) return "€ 0,00";
+        return new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" }).format(value);
+    }
+
+    function isCantiereAttivo(stato) {
+        const s = (stato || "").trim().toUpperCase();
+        return s === "ATTIVO" || s === "IN CORSO" || s === "APERTO" || s === "ACTIVE";
+    }
+
+    function isCantiereVisibile(stato) {
+        const s = (stato || "").trim().toUpperCase();
+        return s !== "ARCHIVIATO";
+    }
+
+    function badgeStyle(stato) {
+        if (isCantiereAttivo(stato)) {
+            return "status status-active";
+        }
+        return "status" + " style=\"background: rgba(255, 93, 115, 0.18); color: #ff9aa8;\"";
+    }
+
+    async function loadCantieri() {
+        const rows = document.getElementById("rows");
+        const empty = document.getElementById("empty");
+        rows.innerHTML = "";
+
+        const response = await fetch("/api/cantieri");
+        const data = await response.json();
+        const cantieri = (data || []).filter(c => isCantiereVisibile(c.stato));
+        document.getElementById("totalCount").textContent = cantieri.length;
+
+        if (!cantieri.length) {
+            empty.style.display = "block";
+            return;
+        }
+        empty.style.display = "none";
+
+        rows.innerHTML = cantieri.map(item => `
+            <tr>
+                <td>${item.id ?? ""}</td>
+                <td>${item.nome ?? ""}</td>
+                <td>${item.indirizzo ?? ""}</td>
+                <td>${item.responsabile ?? ""}</td>
+                <td>${euro(item.budget)}</td>
+                <td><span class="${isCantiereAttivo(item.stato) ? "status status-active" : "status"}" ${isCantiereAttivo(item.stato) ? "" : "style=\"background: rgba(255, 93, 115, 0.18); color: #ff9aa8;\""}>${item.stato ?? ""}</span></td>
+                <td>
+                    <a class="btn" style="display:inline-block;padding:8px 12px;" href="cantiere-dettaglio.html?id=${encodeURIComponent(item.id)}">Entra nel cantiere</a>
+                    <button class="btn" style="display:inline-block;padding:8px 12px;background:#c62828;margin-left:8px;" onclick="eliminaCantiere(${item.id})">Archivia</button>
+                </td>
+            </tr>
+        `).join("");
+    }
+
+    async function eliminaCantiere(id) {
+        if (!confirm("Sei sicuro di voler archiviare questo cantiere?")) {
+            return;
+        }
+
+        const response = await fetch("/api/cantieri/" + id, {
+            method: "DELETE"
+        });
+
+        if (response.ok) {
+            alert("Cantiere archiviato.");
+            loadCantieri();
+            return;
+        }
+
+        const text = await response.text();
+        alert("Errore durante l'eliminazione del cantiere. " + text);
+    }
+
+    loadCantieri();
+</script>
+</body>
+</html>

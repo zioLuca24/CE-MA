@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestione Utenze - Gestionale Edile</title>
+    <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<main class="page">
+    <section class="topbar">
+        <div>
+            <h1 class="title">Gestione Utenze</h1>
+            <div class="muted">Creazione utenti, ruoli, stato attivo e password</div>
+        </div>
+        <button class="btn" onclick="signOut()">Logout</button>
+    </section>
+
+    <nav class="nav">
+        <a href="dashboard.html">Dashboard</a>
+        <a href="cantieri.html">Cantieri</a>
+        <a href="personale.html">Personale</a>
+        <a href="materiali.html">Materiali</a>
+        <a class="active" href="utenti.html">Utenze</a>
+        <a href="controllo-cantiere.html">Controllo Cantiere</a>
+    </nav>
+
+    <section class="card" style="padding:16px; margin-bottom:16px;">
+        <div class="toolbar">
+            <strong>Nuovo utente</strong>
+            <a class="btn" href="modifica-utente.html">Apri modifica utente</a>
+            <span id="createMessage" class="muted"></span>
+        </div>
+        <div class="toolbar" style="align-items:end; flex-wrap:wrap;">
+            <div class="field" style="margin:0; min-width:180px;">
+                <label for="newUsername">Username</label>
+                <input id="newUsername" type="text" placeholder="Es. mario.rossi">
+            </div>
+            <div class="field" style="margin:0; min-width:180px;">
+                <label for="newPassword">Password</label>
+                <input id="newPassword" type="password" placeholder="Minimo 8 caratteri">
+            </div>
+            <div class="field" style="margin:0; min-width:220px;">
+                <label for="newNomeCompleto">Nome completo</label>
+                <input id="newNomeCompleto" type="text" placeholder="Es. Mario Rossi">
+            </div>
+            <div class="field" style="margin:0; min-width:170px;">
+                <label for="newRuolo">Ruolo</label>
+                <select id="newRuolo" style="border:1px solid var(--border);border-radius:12px;padding:10px;background:var(--bg-card-2);color:var(--text);">
+                    <option value="OPERATORE">OPERATORE</option>
+                    <option value="RESPONSABILE_CANTIERE">RESPONSABILE_CANTIERE</option>
+                    <option value="ADMIN">ADMIN</option>
+                </select>
+            </div>
+            <button class="btn" onclick="creaUtente()">Crea utente</button>
+        </div>
+    </section>
+
+    <section class="card" style="padding:16px; margin-bottom:16px;">
+        <div class="toolbar">
+            <strong>Reset password</strong>
+            <span id="passwordMessage" class="muted"></span>
+        </div>
+        <div class="toolbar" style="align-items:end; flex-wrap:wrap;">
+            <div class="field" style="margin:0; min-width:260px;">
+                <label for="passwordUserId">Utente</label>
+                <select id="passwordUserId" style="border:1px solid var(--border);border-radius:12px;padding:10px;background:var(--bg-card-2);color:var(--text);">
+                    <option value="">Seleziona utente</option>
+                </select>
+            </div>
+            <div class="field" style="margin:0; min-width:220px;">
+                <label for="newPasswordValue">Nuova password</label>
+                <input id="newPasswordValue" type="password" placeholder="Minimo 8 caratteri">
+            </div>
+            <button class="btn" onclick="aggiornaPasswordUtente()">Aggiorna password</button>
+        </div>
+    </section>
+
+    <section class="card" style="padding:16px;">
+        <div class="toolbar">
+            <strong>Utenti registrati: <span id="totalCount">0</span></strong>
+            <button class="btn" onclick="loadUtenti()">Aggiorna</button>
+        </div>
+        <div id="tableMessage" class="muted" style="margin-bottom:12px;"></div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Username</th>
+                    <th>Nome completo</th>
+                    <th>Ruolo</th>
+                    <th>Stato</th>
+                    <th>Ultimo accesso</th>
+                    <th>Azione</th>
+                </tr>
+                </thead>
+                <tbody id="rows"></tbody>
+            </table>
+            <div id="empty" class="empty" style="display:none;">Nessun utente disponibile.</div>
+        </div>
+    </section>
+</main>
+
+<script src="assets/auth.js"></script>
+<script>
+    requireAuth();
+
+    const utentiCache = [];
+
+    function escapeHtml(value) {
+        return String(value ?? "")
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll("\"", "&quot;")
+            .replaceAll("'", "&#39;");
+    }
+
+    function formatDateTime(value) {
+        if (!value) return "-";
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return "-";
+        return new Intl.DateTimeFormat("it-IT", {
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit"
+        }).format(date);
+    }
+
+    function ruoloOptions(current) {
+        const roles = ["OPERATORE", "RESPONSABILE_CANTIERE", "ADMIN"];
+        return roles.map(r => `<option value="${r}" ${r === current ? "selected" : ""}>${r}</option>`).join("");
+    }
+
+    async function loadUtenti() {
+        const rows = document.getElementById("rows");
+        const empty = document.getElementById("empty");
+        const tableMessage = document.getElementById("tableMessage");
+        tableMessage.textContent = "";
+        rows.innerHTML = "";
+
+        const response = await fetch("/api/utenti");
+        if (!response.ok) {
+            tableMessage.textContent = "Errore nel caricamento utenze.";
+            return;
+        }
+
+        const data = await response.json();
+        utentiCache.length = 0;
+        data.forEach(u => utentiCache.push(u));
+        document.getElementById("totalCount").textContent = data.length;
+        renderPasswordUsers(data);
+
+        if (!data.length) {
+            empty.style.display = "block";
+            return;
+        }
+        empty.style.display = "none";
+
+        rows.innerHTML = data.map(item => `
+            <tr>
+                <td>${item.id}</td>
+                <td>${escapeHtml(item.username)}</td>
+                <td>
+                    <input id="nome-${item.id}" type="text" value="${escapeHtml(item.nomeCompleto || "")}"
+                           style="width:100%; border:1px solid var(--border); border-radius:10px; padding:8px; background:var(--bg-card-2); color:var(--text);">
+                </td>
+                <td>
+                    <select id="ruolo-${item.id}" style="width:100%; border:1px solid var(--border); border-radius:10px; padding:8px; background:var(--bg-card-2); color:var(--text);">
+                        ${ruoloOptions(item.ruolo || "OPERATORE")}
+                    </select>
+                </td>
+                <td>
+                    <select id="attivo-${item.id}" style="width:100%; border:1px solid var(--border); border-radius:10px; padding:8px; background:var(--bg-card-2); color:var(--text);">
+                        <option value="true" ${item.attivo ? "selected" : ""}>ATTIVO</option>
+                        <option value="false" ${item.attivo ? "" : "selected"}>DISATTIVO</option>
+                    </select>
+                </td>
+                <td>${formatDateTime(item.ultimoAccesso)}</td>
+                <td><button class="btn" onclick="salvaUtente(${item.id})">Salva</button></td>
+            </tr>
+        `).join("");
+    }
+
+    function renderPasswordUsers(users) {
+        const select = document.getElementById("passwordUserId");
+        select.innerHTML = "<option value=''>Seleziona utente</option>" +
+            users.map(u => `<option value="${u.id}">${escapeHtml(u.username)} (${escapeHtml(u.ruolo || "OPERATORE")})</option>`).join("");
+    }
+
+    async function creaUtente() {
+        const message = document.getElementById("createMessage");
+        const username = document.getElementById("newUsername").value.trim();
+        const password = document.getElementById("newPassword").value;
+        const nomeCompleto = document.getElementById("newNomeCompleto").value.trim();
+        const ruolo = document.getElementById("newRuolo").value;
+
+        if (!username || !password) {
+            message.textContent = "Username e password sono obbligatori.";
+            return;
+        }
+
+        const payload = {
+            username: username,
+            password: password,
+            nomeCompleto: nomeCompleto || null,
+            ruolo: ruolo,
+            attivo: true
+        };
+
+        const response = await fetch("/api/utenti", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+            message.textContent = "Errore creazione utente (username già presente o dati non validi).";
+            return;
+        }
+
+        message.textContent = "Utente creato correttamente.";
+        document.getElementById("newUsername").value = "";
+        document.getElementById("newPassword").value = "";
+        document.getElementById("newNomeCompleto").value = "";
+        await loadUtenti();
+    }
+
+    async function salvaUtente(id) {
+        const tableMessage = document.getElementById("tableMessage");
+        tableMessage.textContent = "";
+        const payload = {
+            nomeCompleto: document.getElementById(`nome-${id}`).value.trim() || null,
+            ruolo: document.getElementById(`ruolo-${id}`).value,
+            attivo: document.getElementById(`attivo-${id}`).value === "true"
+        };
+
+        const response = await fetch(`/api/utenti/${encodeURIComponent(id)}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+            tableMessage.textContent = "Errore aggiornamento utente.";
+            return;
+        }
+
+        tableMessage.textContent = `Utente #${id} aggiornato.`;
+        await loadUtenti();
+    }
+
+    async function aggiornaPasswordUtente() {
+        const message = document.getElementById("passwordMessage");
+        const userId = document.getElementById("passwordUserId").value;
+        const nuovaPassword = document.getElementById("newPasswordValue").value;
+
+        if (!userId || !nuovaPassword) {
+            message.textContent = "Seleziona utente e inserisci nuova password.";
+            return;
+        }
+
+        const response = await fetch(`/api/utenti/${encodeURIComponent(userId)}/password`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ nuovaPassword: nuovaPassword })
+        });
+
+        if (!response.ok) {
+            message.textContent = "Errore aggiornamento password (minimo 8 caratteri).";
+            return;
+        }
+
+        message.textContent = "Password aggiornata.";
+        document.getElementById("newPasswordValue").value = "";
+    }
+
+    if (currentRole() && currentRole() !== "ADMIN") {
+        document.querySelector("main").innerHTML = `
+            <section class="card" style="padding:16px; margin-top:32px;">
+                <h2 style="margin-top:0;">Accesso negato</h2>
+                <div class="muted">La sezione utenze è riservata a utenti ADMIN.</div>
+            </section>
+        `;
+    } else {
+        loadUtenti();
+    }
+</script>
+</body>
+</html>

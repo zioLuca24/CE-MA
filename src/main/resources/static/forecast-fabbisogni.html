@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Forecast Fabbisogni - Gestionale Edile</title>
+    <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<main class="page">
+    <section class="topbar">
+        <div>
+            <h1 class="title">Forecast Fabbisogni</h1>
+            <div class="muted">Riordino suggerito e copertura stimata</div>
+        </div>
+        <button class="btn" onclick="signOut()">Logout</button>
+    </section>
+
+    <nav class="nav">
+        <a href="dashboard.html">Dashboard</a>
+        <a href="cantieri.html">Cantieri</a>
+        <a href="personale.html">Personale</a>
+        <a href="materiali.html">Materiali</a>
+        <a href="utenti.html">Utenze</a>
+        <a class="active" href="controllo-cantiere.html">Controllo Cantiere</a>
+    </nav>
+
+    <nav class="subnav">
+        <a href="analisi-sprechi.html">Soglie e Alert</a>
+        <a href="kpi-cantiere.html">KPI Cantiere</a>
+        <a class="active" href="forecast-fabbisogni.html">Forecast Fabbisogni</a>
+        <a href="report-essenziali.html">Report Essenziali</a>
+    </nav>
+
+    <section class="card" style="padding:16px;">
+        <div class="toolbar" style="align-items:end; flex-wrap:wrap;">
+            <div class="field" style="margin:0; min-width:280px;">
+                <label for="cantiereFilter">Cantiere (opzionale)</label>
+                <select id="cantiereFilter" style="border:1px solid var(--border);border-radius:12px;padding:10px;background:var(--bg-card-2);color:var(--text);">
+                    <option value="">Tutti i cantieri</option>
+                </select>
+            </div>
+            <button class="btn" onclick="loadForecast()">Aggiorna forecast</button>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                <tr>
+                    <th>Materiale</th>
+                    <th>Residuo</th>
+                    <th>Giacenza minima</th>
+                    <th>Consumo 30gg</th>
+                    <th>Copertura (giorni)</th>
+                    <th>Fabbisogno 30gg</th>
+                    <th>Riordino suggerito</th>
+                </tr>
+                </thead>
+                <tbody id="rows"></tbody>
+            </table>
+            <div id="empty" class="empty" style="display:none;">Nessun dato forecast disponibile.</div>
+        </div>
+    </section>
+</main>
+
+<script src="assets/auth.js"></script>
+<script>
+    requireAuth();
+
+    function n(value) {
+        if (value === null || value === undefined) return "-";
+        return new Intl.NumberFormat("it-IT", { maximumFractionDigits: 2 }).format(value);
+    }
+
+    async function loadCantieri() {
+        const response = await fetch("/api/cantieri");
+        const data = await response.json();
+        const select = document.getElementById("cantiereFilter");
+        select.innerHTML = "<option value=''>Tutti i cantieri</option>" +
+            data.map(c => `<option value="${c.id}">${c.nome}</option>`).join("");
+    }
+
+    async function loadForecast() {
+        const cantiereId = document.getElementById("cantiereFilter").value;
+        const query = cantiereId ? `?cantiereId=${encodeURIComponent(cantiereId)}` : "";
+        const rows = document.getElementById("rows");
+        const empty = document.getElementById("empty");
+        const response = await fetch("/api/analisi/forecast-fabbisogni" + query);
+        const data = await response.json();
+        if (!data.length) {
+            rows.innerHTML = "";
+            empty.style.display = "block";
+            return;
+        }
+        empty.style.display = "none";
+        rows.innerHTML = data.map(r => `
+            <tr>
+                <td>${r.materialeNome ?? ""}</td>
+                <td>${n(r.quantitaResidua)}</td>
+                <td>${n(r.giacenzaMinima)}</td>
+                <td>${n(r.consumoUltimi30gg)}</td>
+                <td>${n(r.giorniCoperturaStimati)}</td>
+                <td>${n(r.fabbisognoProssimi30gg)}</td>
+                <td>${n(r.riordinoSuggerito)}</td>
+            </tr>
+        `).join("");
+    }
+
+    loadCantieri().then(loadForecast);
+</script>
+</body>
+</html>

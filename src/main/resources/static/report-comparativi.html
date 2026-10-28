@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Report Comparativi - Gestionale Edile</title>
+    <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<main class="page">
+    <section class="topbar">
+        <div>
+            <h1 class="title">Report Comparativi</h1>
+            <div class="muted">Confronto cantiere vs cantiere e mese vs mese</div>
+        </div>
+        <button class="btn" onclick="signOut()">Logout</button>
+    </section>
+
+    <nav class="nav">
+        <a href="dashboard.html">Dashboard</a>
+        <a href="cantieri.html">Cantieri</a>
+        <a href="personale.html">Personale</a>
+        <a href="materiali.html">Materiali</a>
+        <a href="utenti.html">Utenze</a>
+        <a class="active" href="controllo-cantiere.html">Controllo Cantiere</a>
+    </nav>
+
+    <nav class="subnav">
+        <a href="analisi-sprechi.html">Soglie e Alert</a>
+        <a href="kpi-cantiere.html">KPI Cantiere</a>
+        <a href="forecast-fabbisogni.html">Forecast Fabbisogni</a>
+        <a class="active" href="report-comparativi.html">Report Comparativi</a>
+    </nav>
+
+    <section class="card" style="padding:16px; margin-bottom:16px;">
+        <div class="toolbar" style="align-items:end; flex-wrap:wrap;">
+            <strong>Cantiere vs Cantiere</strong>
+            <div class="field" style="margin:0; min-width:200px;">
+                <label for="monthComp">Mese</label>
+                <input id="monthComp" type="month">
+            </div>
+            <button class="btn" onclick="loadComparativoCantieri()">Aggiorna confronto</button>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                <tr>
+                    <th>Cantiere</th>
+                    <th>Quantità caricata</th>
+                    <th>Quantità consumata</th>
+                    <th>Costo consumo materiali</th>
+                </tr>
+                </thead>
+                <tbody id="cantieriRows"></tbody>
+            </table>
+            <div id="cantieriEmpty" class="empty" style="display:none;">Nessun dato comparativo disponibile.</div>
+        </div>
+    </section>
+
+    <section class="card" style="padding:16px;">
+        <div class="toolbar" style="align-items:end; flex-wrap:wrap;">
+            <strong>Mese vs Mese</strong>
+            <div class="field" style="margin:0; min-width:260px;">
+                <label for="cantiereTrend">Cantiere</label>
+                <select id="cantiereTrend" style="border:1px solid var(--border);border-radius:12px;padding:10px;background:var(--bg-card-2);color:var(--text);">
+                    <option value="">Seleziona cantiere</option>
+                </select>
+            </div>
+            <div class="field" style="margin:0; min-width:150px;">
+                <label for="monthsTrend">Mesi</label>
+                <input id="monthsTrend" type="number" min="1" max="24" value="6">
+            </div>
+            <button class="btn" onclick="loadTrend()">Aggiorna trend</button>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                <tr>
+                    <th>Mese</th>
+                    <th>Quantità caricata</th>
+                    <th>Quantità consumata</th>
+                    <th>Costo consumo materiali</th>
+                </tr>
+                </thead>
+                <tbody id="trendRows"></tbody>
+            </table>
+            <div id="trendEmpty" class="empty" style="display:none;">Nessun trend disponibile.</div>
+        </div>
+    </section>
+</main>
+
+<script src="assets/auth.js"></script>
+<script>
+    requireAuth();
+
+    function n(value) {
+        if (value === null || value === undefined) return "-";
+        return new Intl.NumberFormat("it-IT", { maximumFractionDigits: 2 }).format(value);
+    }
+
+    function euro(value) {
+        if (value === null || value === undefined) return "€ 0,00";
+        return new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" }).format(value);
+    }
+
+    async function loadCantieri() {
+        const response = await fetch("/api/cantieri");
+        const data = await response.json();
+        const select = document.getElementById("cantiereTrend");
+        select.innerHTML = "<option value=''>Seleziona cantiere</option>" +
+            data.map(c => `<option value="${c.id}">${c.nome}</option>`).join("");
+    }
+
+    async function loadComparativoCantieri() {
+        const month = document.getElementById("monthComp").value;
+        const query = month ? `?month=${encodeURIComponent(month)}` : "";
+        const rows = document.getElementById("cantieriRows");
+        const empty = document.getElementById("cantieriEmpty");
+        const response = await fetch("/api/analisi/report/comparativo-cantieri" + query);
+        const data = await response.json();
+        if (!data.length) {
+            rows.innerHTML = "";
+            empty.style.display = "block";
+            return;
+        }
+        empty.style.display = "none";
+        rows.innerHTML = data.map(r => `
+            <tr>
+                <td>${r.cantiereNome ?? ""}</td>
+                <td>${n(r.quantitaCaricata)}</td>
+                <td>${n(r.quantitaConsumata)}</td>
+                <td>${euro(r.costoConsumoMateriali)}</td>
+            </tr>
+        `).join("");
+    }
+
+    async function loadTrend() {
+        const cantiereId = document.getElementById("cantiereTrend").value;
+        const months = document.getElementById("monthsTrend").value || "6";
+        const rows = document.getElementById("trendRows");
+        const empty = document.getElementById("trendEmpty");
+        if (!cantiereId) {
+            rows.innerHTML = "";
+            empty.style.display = "block";
+            empty.textContent = "Seleziona un cantiere per vedere il trend mese vs mese.";
+            return;
+        }
+        const response = await fetch(`/api/analisi/report/mese-vs-mese?cantiereId=${encodeURIComponent(cantiereId)}&months=${encodeURIComponent(months)}`);
+        const data = await response.json();
+        if (!data.length) {
+            rows.innerHTML = "";
+            empty.style.display = "block";
+            return;
+        }
+        empty.style.display = "none";
+        rows.innerHTML = data.map(r => `
+            <tr>
+                <td>${r.mese ?? ""}</td>
+                <td>${n(r.quantitaCaricata)}</td>
+                <td>${n(r.quantitaConsumata)}</td>
+                <td>${euro(r.costoConsumoMateriali)}</td>
+            </tr>
+        `).join("");
+    }
+
+    function initMonth() {
+        const today = new Date();
+        const month = String(today.getMonth() + 1).padStart(2, "0");
+        document.getElementById("monthComp").value = `${today.getFullYear()}-${month}`;
+    }
+
+    initMonth();
+    loadCantieri().then(loadComparativoCantieri);
+</script>
+</body>
+</html>

@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nuovo Dipendente - Gestionale Edile</title>
+    <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<main class="page">
+    <section class="topbar">
+        <div>
+            <h1 class="title">Nuovo dipendente</h1>
+            <div class="muted">Aggiungi un nuovo dipendente all’anagrafica del personale</div>
+        </div>
+        <button class="btn" onclick="signOut()">Logout</button>
+    </section>
+
+    <nav class="nav">
+        <a href="dashboard.html">Dashboard</a>
+        <a href="cantieri.html">Cantieri</a>
+        <a class="active" href="personale.html">Personale</a>
+        <a href="materiali.html">Materiali</a>
+        <a href="utenti.html">Utenze</a>
+        <a href="controllo-cantiere.html">Controllo Cantiere</a>
+    </nav>
+
+    <nav class="subnav">
+        <a href="anagrafica-personale.html">Anagrafica Personale</a>
+        <a class="active" href="nuovo-dipendente.html">Nuovo Dipendente</a>
+        <a href="turni-personale.html">Turni Personale</a>
+    </nav>
+
+    <section class="card" style="padding: 16px; max-width: 900px; margin: 0 auto;">
+        <div class="toolbar" style="margin-bottom: 16px;">
+            <strong>Inserimento nuovo dipendente</strong>
+            <a class="btn" href="anagrafica-personale.html">Torna all’elenco</a>
+        </div>
+
+        <form id="dipendenteForm" onsubmit="event.preventDefault(); salvaDipendente();">
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+                <div class="field">
+                    <label for="nome">Nome</label>
+                    <input id="nome" type="text" required>
+                </div>
+                <div class="field">
+                    <label for="cognome">Cognome</label>
+                    <input id="cognome" type="text" required>
+                </div>
+                <div class="field">
+                    <label for="qualifica">Qualifica</label>
+                    <input id="qualifica" type="text" placeholder="es. Muratore, Impiantista">
+                </div>
+                <div class="field">
+                    <label for="dataAssunzione">Data assunzione</label>
+                    <input id="dataAssunzione" type="date">
+                </div>
+                <div class="field">
+                    <label for="stato">Stato</label>
+                    <select id="stato" style="border:1px solid var(--border);border-radius:12px;padding:10px;background:var(--bg-card-2);color:var(--text);">
+                        <option value="IN SERVIZIO">IN SERVIZIO</option>
+                        <option value="NON ASSEGNATO">NON ASSEGNATO</option>
+                        <option value="IN FERIE">IN FERIE</option>
+                        <option value="IN PAUSA">IN PAUSA</option>
+                        <option value="ATTIVO">ATTIVO</option>
+                        <option value="INATTIVO">INATTIVO</option>
+                        <option value="SOSPESO">SOSPESO</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="telefono">Telefono</label>
+                    <input id="telefono" type="tel" placeholder="es. +39 333 1234567">
+                </div>
+                <div class="field" style="grid-column: 1 / -1;">
+                    <label for="email">Email</label>
+                    <input id="email" type="email" placeholder="es. nome.cognome@azienda.it">
+                </div>
+            </div>
+
+            <div id="message" class="muted" style="margin-top:16px; min-height:24px;"></div>
+
+            <div class="toolbar" style="margin-top:18px; justify-content:flex-end;">
+                <button type="button" class="btn btn-secondary" onclick="window.location.href='anagrafica-personale.html'">Annulla</button>
+                <button type="submit" class="btn">Salva dipendente</button>
+            </div>
+        </form>
+    </section>
+</main>
+
+<script src="assets/auth.js"></script>
+<script>
+    requireAuth();
+
+    const messageEl = document.getElementById("message");
+
+    function setMessage(text, isError = false) {
+        messageEl.textContent = text;
+        messageEl.style.color = isError ? "var(--danger, #dc2626)" : "var(--success, #15803d)";
+    }
+
+    async function salvaDipendente() {
+        const payload = {
+            nome: document.getElementById("nome").value.trim(),
+            cognome: document.getElementById("cognome").value.trim(),
+            qualifica: document.getElementById("qualifica").value.trim() || null,
+            dataAssunzione: document.getElementById("dataAssunzione").value || null,
+            stato: document.getElementById("stato").value,
+            telefono: document.getElementById("telefono").value.trim() || null,
+            email: document.getElementById("email").value.trim() || null
+        };
+
+        if (!payload.nome || !payload.cognome) {
+            setMessage("Nome e cognome sono obbligatori.", true);
+            return;
+        }
+
+        const response = await fetch("/api/dipendenti", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            setMessage("Errore durante il salvataggio del dipendente: " + (errorText || response.statusText), true);
+            return;
+        }
+
+        setMessage("Dipendente salvato correttamente.");
+        document.getElementById("dipendenteForm").reset();
+        document.getElementById("stato").value = "ATTIVO";
+
+        setTimeout(() => {
+            window.location.href = "anagrafica-personale.html";
+        }, 700);
+    }
+</script>
+</body>
+</html>

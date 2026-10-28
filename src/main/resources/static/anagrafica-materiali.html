@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anagrafica Materiali - Gestionale Edile</title>
+    <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<main class="page">
+    <section class="topbar">
+        <div>
+            <h1 class="title">Anagrafica Materiali</h1>
+            <div class="muted">Disponibilità aggiornata automaticamente da bolle e movimenti</div>
+        </div>
+        <button class="btn" onclick="signOut()">Logout</button>
+    </section>
+
+    <nav class="nav">
+        <a href="dashboard.html">Dashboard</a>
+        <a href="cantieri.html">Cantieri</a>
+        <a href="personale.html">Personale</a>
+        <a class="active" href="materiali.html">Materiali</a>
+        <a href="utenti.html">Utenze</a>
+        <a href="controllo-cantiere.html">Controllo Cantiere</a>
+    </nav>
+
+    <nav class="subnav">
+        <a class="active" href="anagrafica-materiali.html">Anagrafica Materiali</a>
+        <a href="anagrafica-fornitori.html">Anagrafica Fornitori</a>
+        <a href="carica-bolla-materiali.html">Carica Bolla Materiali</a>
+    </nav>
+
+    <section class="card" style="padding: 16px;">
+        <div class="toolbar" style="margin-bottom:12px;">
+            <div class="field" style="margin:0; min-width:220px;">
+                <label for="cantiereFilter">Cantiere X</label>
+                <select id="cantiereFilter" style="border:1px solid var(--border);border-radius:12px;padding:10px;background:var(--bg-card-2);color:var(--text);">
+                    <option value="">Seleziona cantiere</option>
+                </select>
+            </div>
+            <button class="btn" onclick="loadAnagrafica()">Aggiorna</button>
+            <button class="btn" onclick="window.location.href='ins-materiali.html'">Inserisci Materiali</button>
+        </div>
+
+        <div class="table-wrap">
+            <table>
+                <thead>
+                <tr>
+                    <th>Nome Materiale</th>
+                    <th>Descrizione</th>
+                    <th>Quantità acquistata</th>
+                    <th>Quantità utilizzata</th>
+                    <th>Quantità residua</th>
+                    <th>Quantità acquistata per Cantiere X</th>
+                </tr>
+                </thead>
+                <tbody id="rows"></tbody>
+            </table>
+            <div id="empty" class="empty" style="display:none;">Nessun materiale disponibile.</div>
+        </div>
+    </section>
+</main>
+
+<script src="assets/auth.js"></script>
+<script>
+    requireAuth();
+
+    function formatNumero(value) {
+        if (value === null || value === undefined) return "0";
+        return new Intl.NumberFormat("it-IT", { maximumFractionDigits: 2 }).format(value);
+    }
+
+    async function loadCantieri() {
+        const select = document.getElementById("cantiereFilter");
+        const response = await fetch("/api/cantieri");
+        const cantieri = await response.json();
+        select.innerHTML = "<option value=''>Seleziona cantiere</option>" + cantieri.map(c => `<option value="${c.id}">${c.nome}</option>`).join("");
+        select.addEventListener("change", loadAnagrafica);
+    }
+
+    async function loadAnagrafica() {
+        const rows = document.getElementById("rows");
+        const empty = document.getElementById("empty");
+        const cantiereId = document.getElementById("cantiereFilter").value;
+        const query = cantiereId ? ("?cantiereId=" + encodeURIComponent(cantiereId)) : "";
+        const response = await fetch("/api/materiali/anagrafica" + query);
+        const data = await response.json();
+
+        if (!data.length) {
+            rows.innerHTML = "";
+            empty.style.display = "block";
+            return;
+        }
+        empty.style.display = "none";
+
+        rows.innerHTML = data.map(item => `
+            <tr>
+                <td>${item.nomeMateriale ?? ""}</td>
+                <td>${item.descrizione ?? ""}</td>
+                <td>${formatNumero(item.quantitaAcquistata)}</td>
+                <td>${formatNumero(item.quantitaUtilizzata)}</td>
+                <td>${formatNumero(item.quantitaResidua)}</td>
+                <td>${formatNumero(item.quantitaAcquistataPerCantiere)}</td>
+            </tr>
+        `).join("");
+    }
+
+    loadCantieri().then(loadAnagrafica);
+</script>
+</body>
+</html>

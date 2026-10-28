@@ -1,12 +1,21 @@
 services:
   - type: web
-    name: ce-ma
-    env: docker
-    region: frankfurt
-    dockerfilePath: Dockerfile
+    name: gestionale-edile
+    runtime: java
+    runtimeVersion: 8
+    buildCommand: mvn clean package -DskipTests -Prender
+    startCommand: java -jar target/gestionale-edile-1.0.0.jar
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      - key: PORT
+        value: 8080
+      - key: JAVA_OPTS
+        value: -Xmx512m -Xms256m
+    autoDeploy: true
 
 databases:
-  - name: cema_prod
-    databaseName: cema_prod
-    user: cema
-    region: frankfurt
+  - name: gestionale-edile-db
+    databaseName: gestionale_edile_prod
+    user: gestionale_user
+    region: oregon

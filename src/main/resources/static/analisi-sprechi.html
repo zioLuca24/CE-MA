@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analisi Sprechi - Gestionale Edile</title>
+    <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<main class="page">
+    <section class="topbar">
+        <div>
+            <h1 class="title">Analisi Sprechi</h1>
+            <div class="muted">Soglie e alert automatici su materiali e cantieri</div>
+        </div>
+        <button class="btn" onclick="signOut()">Logout</button>
+    </section>
+
+    <nav class="nav">
+        <a href="dashboard.html">Dashboard</a>
+        <a href="cantieri.html">Cantieri</a>
+        <a href="personale.html">Personale</a>
+        <a href="materiali.html">Materiali</a>
+        <a href="utenti.html">Utenze</a>
+        <a class="active" href="controllo-cantiere.html">Controllo Cantiere</a>
+    </nav>
+
+    <nav class="subnav">
+        <a class="active" href="analisi-sprechi.html">Soglie e Alert</a>
+        <a href="kpi-cantiere.html">KPI Cantiere</a>
+        <a href="forecast-fabbisogni.html">Forecast Fabbisogni</a>
+        <a href="report-essenziali.html">Report Essenziali</a>
+    </nav>
+
+    <section class="card" style="padding:16px; margin-bottom:16px;">
+        <div class="toolbar">
+            <strong>Nuova soglia</strong>
+            <span id="sogliaMessage" class="muted"></span>
+        </div>
+        <div class="toolbar" style="align-items:end; flex-wrap:wrap;">
+            <div class="field" style="margin:0; min-width:280px;">
+                <label for="materialeSoglia">Materiale</label>
+                <select id="materialeSoglia" style="border:1px solid var(--border);border-radius:12px;padding:10px;background:var(--bg-card-2);color:var(--text);">
+                    <option value="">Seleziona materiale</option>
+                </select>
+            </div>
+            <div class="field" style="margin:0; min-width:260px;">
+                <label for="cantiereSoglia">Cantiere (opzionale)</label>
+                <select id="cantiereSoglia" style="border:1px solid var(--border);border-radius:12px;padding:10px;background:var(--bg-card-2);color:var(--text);">
+                    <option value="">Globale (tutti i cantieri)</option>
+                </select>
+            </div>
+            <div class="field" style="margin:0; min-width:180px;">
+                <label for="giacenzaMinima">Soglia attenzione</label>
+                <input id="giacenzaMinima" type="number" min="0" step="0.01" placeholder="Es. 50">
+            </div>
+            <div class="field" style="margin:0; min-width:180px;">
+                <label for="giacenzaCritica">Soglia critica</label>
+                <input id="giacenzaCritica" type="number" min="0" step="0.01" placeholder="Es. 25">
+            </div>
+            <div class="field" style="margin:0; min-width:220px;">
+                <label for="consumoMax">Consumo massimo 30gg</label>
+                <input id="consumoMax" type="number" min="0" step="0.01" placeholder="Es. 200">
+            </div>
+            <button class="btn" onclick="creaSoglia()">Crea soglia</button>
+        </div>
+    </section>
+
+    <section class="card" style="padding:16px; margin-bottom:16px;">
+        <div class="toolbar">
+            <strong>Soglie configurate</strong>
+            <button class="btn" onclick="loadSoglie()">Aggiorna</button>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Materiale</th>
+                    <th>Cantiere</th>
+                    <th>Soglia attenzione</th>
+                    <th>Soglia critica</th>
+                    <th>Consumo max 30gg</th>
+                    <th>Stato</th>
+                    <th>Azione</th>
+                </tr>
+                </thead>
+                <tbody id="soglieRows"></tbody>
+            </table>
+            <div id="soglieEmpty" class="empty" style="display:none;">Nessuna soglia configurata.</div>
+        </div>
+    </section>
+
+    <section class="card" style="padding:16px;">
+        <div class="toolbar" style="align-items:end; flex-wrap:wrap;">
+            <strong>Alert sprechi</strong>
+            <div class="field" style="margin:0; min-width:260px;">
+                <label for="filtroCantiereAlert">Filtro cantiere</label>
+                <select id="filtroCantiereAlert" style="border:1px solid var(--border);border-radius:12px;padding:10px;background:var(--bg-card-2);color:var(--text);">
+                    <option value="">Tutti i cantieri</option>
+                </select>
+            </div>
+            <button class="btn" onclick="loadAlert()">Aggiorna alert</button>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                <tr>
+                    <th>Severità</th>
+                    <th>Tipo</th>
+                    <th>Materiale</th>
+                    <th>Cantiere</th>
+                    <th>Valore attuale</th>
+                    <th>Soglia</th>
+                    <th>Azione consigliata</th>
+                </tr>
+                </thead>
+                <tbody id="alertRows"></tbody>
+            </table>
+            <div id="alertEmpty" class="empty" style="display:none;">Nessun alert attivo.</div>
+        </div>
+    </section>
+
+    <section class="card" style="padding:16px; margin-top:16px;">
+        <div class="toolbar">
+            <strong>Top 5 materiali più critici</strong>
+            <button class="btn" onclick="loadTopCritici()">Aggiorna top 5</button>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                <tr>
+                    <th>Materiale</th>
+                    <th>Cantiere</th>
+                    <th>Giacenza attuale</th>
+                    <th>Soglia attenzione</th>
+                    <th>Soglia critica</th>
+                    <th>Stato</th>
+                </tr>
+                </thead>
+                <tbody id="topRows"></tbody>
+            </table>
+            <div id="topEmpty" class="empty" style="display:none;">Nessun materiale critico rilevato.</div>
+        </div>
+    </section>
+</main>
+
+<script src="assets/auth.js"></script>
+<script>
+    requireAuth();
+
+    function n(value) {
+        if (value === null || value === undefined) return "-";
+        return new Intl.NumberFormat("it-IT", { maximumFractionDigits: 2 }).format(value);
+    }
+
+    function escapeHtml(value) {
+        return String(value ?? "")
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll("\"", "&quot;")
+            .replaceAll("'", "&#39;");
+    }
+
+    function badge(severita) {
+        const s = (severita || "").toUpperCase();
+        if (s === "CRITICO") return `<span class="status" style="background:rgba(255,93,115,0.22);color:#ff9dac;">CRITICO</span>`;
+        if (s === "ALTA") return `<span class="status" style="background:rgba(255,170,70,0.25);color:#ffd49c;">ALTA</span>`;
+        return `<span class="status" style="background:rgba(122,242,200,0.20);color:#a4f6dc;">MEDIA</span>`;
+    }
+
+    function badgeStato(stato) {
+        const s = (stato || "").toUpperCase();
+        if (s === "CRITICO") return `<span class="status" style="background:rgba(255,93,115,0.22);color:#ff9dac;">CRITICO</span>`;
+        if (s === "ATTENZIONE") return `<span class="status" style="background:rgba(255,170,70,0.25);color:#ffd49c;">ATTENZIONE</span>`;
+        return `<span class="status" style="background:rgba(122,242,200,0.20);color:#a4f6dc;">OK</span>`;
+    }
+
+    async function loadReferenceData() {
+        const [matRes, canRes] = await Promise.all([
+            fetch("/api/materiali/anagrafica"),
+            fetch("/api/cantieri")
+        ]);
+        const materiali = await matRes.json();
+        const cantieri = await canRes.json();
+
+        const materialeSelect = document.getElementById("materialeSoglia");
+        materialeSelect.innerHTML = "<option value=''>Seleziona materiale</option>" +
+            materiali.map(m => `<option value="${m.materialeId}">${escapeHtml(m.nomeMateriale)}</option>`).join("");
+
+        const cantiereSoglia = document.getElementById("cantiereSoglia");
+        const filtroAlert = document.getElementById("filtroCantiereAlert");
+        const cantiereOptions = cantieri.map(c => `<option value="${c.id}">${escapeHtml(c.nome)}</option>`).join("");
+        cantiereSoglia.innerHTML = "<option value=''>Globale (tutti i cantieri)</option>" + cantiereOptions;
+        filtroAlert.innerHTML = "<option value=''>Tutti i cantieri</option>" + cantiereOptions;
+    }
+
+    async function creaSoglia() {
+        const materialeId = document.getElementById("materialeSoglia").value;
+        const cantiereId = document.getElementById("cantiereSoglia").value;
+        const giacenzaMinima = document.getElementById("giacenzaMinima").value;
+        const giacenzaCritica = document.getElementById("giacenzaCritica").value;
+        const consumoMax = document.getElementById("consumoMax").value;
+        const msg = document.getElementById("sogliaMessage");
+
+        if (!materialeId) {
+            msg.textContent = "Seleziona un materiale.";
+            return;
+        }
+
+        const payload = {
+            materialeId: parseInt(materialeId, 10),
+            cantiereId: cantiereId ? parseInt(cantiereId, 10) : null,
+            giacenzaMinima: giacenzaMinima ? parseFloat(giacenzaMinima) : null,
+            giacenzaCritica: giacenzaCritica ? parseFloat(giacenzaCritica) : null,
+            consumoMensileMassimo: consumoMax ? parseFloat(consumoMax) : null,
+            attiva: true
+        };
+
+        const response = await fetch("/api/analisi/soglie", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            msg.textContent = body.message || "Errore creazione soglia.";
+            return;
+        }
+
+        msg.textContent = "Soglia creata.";
+        document.getElementById("giacenzaMinima").value = "";
+        document.getElementById("giacenzaCritica").value = "";
+        document.getElementById("consumoMax").value = "";
+        await loadSoglie();
+        await loadAlert();
+        await loadTopCritici();
+    }
+
+    async function loadSoglie() {
+        const rows = document.getElementById("soglieRows");
+        const empty = document.getElementById("soglieEmpty");
+        const response = await fetch("/api/analisi/soglie");
+        const data = await response.json();
+
+        if (!data.length) {
+            rows.innerHTML = "";
+            empty.style.display = "block";
+            return;
+        }
+        empty.style.display = "none";
+        rows.innerHTML = data.map(s => `
+            <tr>
+                <td>${s.sogliaId}</td>
+                <td>${escapeHtml(s.materialeNome || "-")}</td>
+                <td>${escapeHtml(s.cantiereNome || "Globale")}</td>
+                <td>${n(s.giacenzaMinima)}</td>
+                <td>${n(s.giacenzaCritica)}</td>
+                <td>${n(s.consumoMensileMassimo)}</td>
+                <td>${s.attiva ? "Attiva" : "Disattiva"}</td>
+                <td><button class="btn" onclick="deleteSoglia(${s.sogliaId})">Elimina</button></td>
+            </tr>
+        `).join("");
+    }
+
+    async function deleteSoglia(id) {
+        await fetch(`/api/analisi/soglie/${encodeURIComponent(id)}`, { method: "DELETE" });
+        await loadSoglie();
+        await loadAlert();
+        await loadTopCritici();
+    }
+
+    async function loadAlert() {
+        const rows = document.getElementById("alertRows");
+        const empty = document.getElementById("alertEmpty");
+        const cantiereId = document.getElementById("filtroCantiereAlert").value;
+        const query = cantiereId ? `?cantiereId=${encodeURIComponent(cantiereId)}` : "";
+        const response = await fetch("/api/analisi/alert-sprechi" + query);
+        const data = await response.json();
+
+        if (!data.length) {
+            rows.innerHTML = "";
+            empty.style.display = "block";
+            return;
+        }
+        empty.style.display = "none";
+        rows.innerHTML = data.map(a => `
+            <tr>
+                <td>${badge(a.severita)}</td>
+                <td>${escapeHtml(a.codice)}</td>
+                <td>${escapeHtml(a.materialeNome || "-")}</td>
+                <td>${escapeHtml(a.cantiereNome || "Globale")}</td>
+                <td>${n(a.valoreAttuale)}</td>
+                <td>${n(a.soglia)}</td>
+                <td>${escapeHtml(a.azioneConsigliata || "")}</td>
+            </tr>
+        `).join("");
+    }
+
+    async function loadTopCritici() {
+        const rows = document.getElementById("topRows");
+        const empty = document.getElementById("topEmpty");
+        const cantiereId = document.getElementById("filtroCantiereAlert").value;
+        const query = cantiereId ? `?cantiereId=${encodeURIComponent(cantiereId)}` : "";
+        const response = await fetch("/api/analisi/indicatori-materiali" + query);
+        const data = await response.json();
+        const top = (data || [])
+            .filter(r => (r.stato || "") !== "OK")
+            .sort((a, b) => (b.punteggioRischio || 0) - (a.punteggioRischio || 0))
+            .slice(0, 5);
+
+        if (!top.length) {
+            rows.innerHTML = "";
+            empty.style.display = "block";
+            return;
+        }
+        empty.style.display = "none";
+        rows.innerHTML = top.map(r => `
+            <tr>
+                <td>${escapeHtml(r.materialeNome || "-")}</td>
+                <td>${escapeHtml(r.cantiereNome || "Globale")}</td>
+                <td>${n(r.giacenzaAttuale)}</td>
+                <td>${n(r.sogliaAttenzione)}</td>
+                <td>${n(r.sogliaCritica)}</td>
+                <td>${badgeStato(r.stato)}</td>
+            </tr>
+        `).join("");
+    }
+
+    loadReferenceData().then(async () => {
+        await loadSoglie();
+        await loadAlert();
+        await loadTopCritici();
+    });
+</script>
+</body>
+</html>

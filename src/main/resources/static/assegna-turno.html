@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Assegna Turno - Gestionale Edile</title>
+    <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<main class="page">
+    <section class="topbar">
+        <div>
+            <h1 class="title">Assegna Turno</h1>
+            <div class="muted">Assegna un dipendente a un cantiere con data e fascia oraria.</div>
+        </div>
+        <button class="btn" onclick="signOut()">Logout</button>
+    </section>
+
+    <nav class="nav">
+        <a href="dashboard.html">Dashboard</a>
+        <a href="cantieri.html">Cantieri</a>
+        <a class="active" href="personale.html">Personale</a>
+        <a href="materiali.html">Materiali</a>
+        <a href="utenti.html">Utenze</a>
+        <a href="controllo-cantiere.html">Controllo Cantiere</a>
+    </nav>
+
+    <section class="card" style="padding: 16px;">
+        <div class="toolbar">
+            <a class="btn" style="display:inline-block;padding:8px 12px;" href="anagrafica-personale.html">Torna ad anagrafica personale</a>
+        </div>
+
+        <form id="formTurno" onsubmit="salvaTurno(event)">
+            <div class="field">
+                <label for="dipendenteSelect">Dipendente</label>
+                <select id="dipendenteSelect" required style="border:1px solid var(--border);border-radius:12px;padding:10px;background:var(--bg-card-2);color:var(--text);">
+                    <option value="">Seleziona dipendente</option>
+                </select>
+            </div>
+
+            <div class="field">
+                <label for="cantiereSelect">Cantiere</label>
+                <select id="cantiereSelect" required style="border:1px solid var(--border);border-radius:12px;padding:10px;background:var(--bg-card-2);color:var(--text);">
+                    <option value="">Seleziona cantiere</option>
+                </select>
+            </div>
+
+            <div class="field">
+                <label for="dataInput">Data</label>
+                <input id="dataInput" type="date" required>
+            </div>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+                <div class="field">
+                    <label for="oraInizioInput">Ora inizio</label>
+                    <input id="oraInizioInput" type="time" required>
+                </div>
+                <div class="field">
+                    <label for="oraFineInput">Ora fine</label>
+                    <input id="oraFineInput" type="time" required>
+                </div>
+            </div>
+
+            <div class="field">
+                <label for="noteInput">Note</label>
+                <textarea id="noteInput" rows="3" style="border:1px solid var(--border);border-radius:12px;padding:10px;background:var(--bg-card-2);color:var(--text);"></textarea>
+            </div>
+
+            <div style="display:flex; gap:12px; justify-content:flex-end; margin-top:24px;">
+                <button type="button" class="btn" onclick="window.location.href='turni-personale.html'">Annulla</button>
+                <button type="submit" class="btn">Salva turno</button>
+            </div>
+        </form>
+    </section>
+</main>
+
+<script src="assets/auth.js"></script>
+<script>
+    requireAuth();
+
+    let currentDipendenti = [];
+    let currentCantieri = [];
+
+    async function loadDipendenti() {
+        const response = await fetch("/api/dipendenti");
+        currentDipendenti = await response.json();
+        const select = document.getElementById("dipendenteSelect");
+        select.innerHTML = "<option value=''>Seleziona dipendente</option>" +
+            currentDipendenti
+                .map(d => `<option value="${d.id}">${d.nome} ${d.cognome} - ${d.qualifica ?? ""}</option>`)
+                .join("");
+    }
+
+    async function loadCantieri() {
+        const response = await fetch("/api/cantieri");
+        currentCantieri = await response.json();
+        const select = document.getElementById("cantiereSelect");
+        select.innerHTML = "<option value=''>Seleziona cantiere</option>" +
+            currentCantieri
+                .filter(c => ((c.stato || "").trim().toUpperCase() !== "ARCHIVIATO"))
+                .map(c => `<option value="${c.id}">${c.nome}</option>`)
+                .join("");
+    }
+
+    async function salvaTurno(event) {
+        event.preventDefault();
+
+        const dipendenteId = document.getElementById("dipendenteSelect").value;
+        const cantiereId = document.getElementById("cantiereSelect").value;
+        const data = document.getElementById("dataInput").value;
+        const oraInizio = document.getElementById("oraInizioInput").value;
+        const oraFine = document.getElementById("oraFineInput").value;
+        const note = document.getElementById("noteInput").value;
+
+        if (!dipendenteId || !cantiereId || !data || !oraInizio || !oraFine) {
+            alert("Compila tutti i campi obbligatori.");
+            return;
+        }
+        if (oraFine <= oraInizio) {
+            alert("L'ora di fine deve essere successiva all'ora di inizio.");
+            return;
+        }
+
+        const nuovoTurno = {
+            dipendente: { id: Number(dipendenteId) },
+            cantiere: { id: Number(cantiereId) },
+            data: data,
+            oraInizio: oraInizio,
+            oraFine: oraFine,
+            note: note,
+            statoAttivita: "ASSEGNATO"
+        };
+
+        const response = await fetch("/api/turni", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(nuovoTurno)
+        });
+
+        if (response.ok) {
+            alert("Turno salvato correttamente.");
+            document.getElementById("formTurno").reset();
+            return;
+        }
+
+        const text = await response.text();
+        alert("Errore nel salvataggio del turno. " + text);
+    }
+
+    loadDipendenti();
+    loadCantieri();
+</script>
+</body>
+</html>

@@ -20,12 +20,13 @@ public class MaterialeImportService {
 
     private static final Pattern DECIMAL_PATTERN = Pattern.compile("\\d+[\\.,]\\d+");
     private static final Pattern MONEY_PATTERN = Pattern.compile("\\d+[\\.,]\\d{2}");
-    private static final Pattern UM_PATTERN = Pattern.compile("\\b(PZ|KG|LT|MT|M2|M3|NR)\\b", Pattern.CASE_INSENSITIVE);
+    private static final Pattern UM_PATTERN = Pattern.compile("\\b(PZ|KG|LT|MT|ML|MQ|M2|M3|NR|CF|CT|SC|SA|BA|BN|PL|CONF|PAL|GR|TN)\\b", Pattern.CASE_INSENSITIVE);
     private static final Pattern ROW_UM_PATTERN = Pattern.compile("\\b(PZ|KG|LT|MT|M2|M3)\\b", Pattern.CASE_INSENSITIVE);
     private static final Pattern ARTICLE_CODE_PATTERN = Pattern.compile("^[A-Z0-9][A-Z0-9\\-/]{0,19}$");
+    private static final Pattern IVA_AFTER_TOTAL_PATTERN = Pattern.compile("^(\\d{1,2})(?:[.,]0+)?\\b");
 
     public List<BollaRow> parseBollaRows(MultipartFile file) throws IOException {
-        String text = extractText(file);
+        String text = leggiTesto(file);
         if (text == null || text.trim().isEmpty()) {
             throw new IllegalArgumentException("Il file non contiene testo leggibile.");
         }
@@ -38,8 +39,16 @@ public class MaterialeImportService {
         return righe;
     }
 
+    public String leggiTesto(MultipartFile file) throws IOException {
+        return extractText(file);
+    }
+
     List<BollaRow> parseRowsFromText(String text) {
         return parseRows(text);
+    }
+
+    public List<BollaRow> righeDaTesto(String text) {
+        return text == null || text.trim().isEmpty() ? new ArrayList<BollaRow>() : parseRows(text);
     }
 
     private String extractText(MultipartFile file) throws IOException {
@@ -239,13 +248,24 @@ public class MaterialeImportService {
 
         ValueMatch quantitaToken = valori.get(0);
         ValueMatch prezzoUnitarioToken = valori.get(1);
-        ValueMatch prezzoTotaleToken = valori.get(2);
+        ValueMatch prezzoTotaleToken = valori.get(valori.size() - 1);
+
+        String sconti = valori.size() > 3
+                ? normalized.substring(prezzoUnitarioToken.end(), prezzoTotaleToken.start).trim()
+                : "";
+
+        String codiceIva = "";
+        Matcher ivaMatcher = IVA_AFTER_TOTAL_PATTERN.matcher(normalized.substring(prezzoTotaleToken.end()).trim());
+        if (ivaMatcher.find()) {
+            codiceIva = ivaMatcher.group(1);
+        }
 
         String descrizioneConUm = normalized.substring(firstSpace, quantitaToken.start).trim();
         String descrizione = estraiDescrizioneDaPrefisso(descrizioneConUm);
         if (descrizione.isEmpty()) {
             return null;
         }
+        String unitaMisura = estraiUnitaMisura(descrizioneConUm);
 
         Double quantita = parseDouble(quantitaToken.value);
         Double prezzoUnitario = parseDouble(prezzoUnitarioToken.value);
@@ -254,7 +274,7 @@ public class MaterialeImportService {
             return null;
         }
 
-        return new BollaRow(
+        BollaRow row = new BollaRow(
                 numeroBolla,
                 codiceArticolo,
                 descrizione,
@@ -264,6 +284,19 @@ public class MaterialeImportService {
                 prezzoTotale == null ? 0.0 : prezzoTotale,
                 cantiereRaw
         );
+        row.setUnitaMisura(unitaMisura);
+        row.setSconti(sconti);
+        row.setCodiceIva(codiceIva);
+        return row;
+    }
+
+    private String estraiUnitaMisura(String text) {
+        Matcher matcher = UM_PATTERN.matcher(normalizeSpaces(text));
+        String last = "";
+        while (matcher.find()) {
+            last = matcher.group(1).toUpperCase(Locale.ROOT);
+        }
+        return last;
     }
 
     private String estraiDescrizioneDaPrefisso(String text) {
@@ -323,7 +356,10 @@ public class MaterialeImportService {
         return upper.startsWith("ATTENZIONE")
                 || upper.startsWith("MERCE RITIRATA")
                 || upper.startsWith("NUMERO COLLI")
-                || upper.startsWith("TOTALE DOCUMENTO")
+                || upper.startsWith("TOTALE")
+                || upper.startsWith("IMPONIBILE")
+                || upper.startsWith("RIEPILOGO")
+                || upper.startsWith("ACCONTO")
                 || upper.startsWith("C. IVA")
                 || upper.startsWith("DESCRIZIONE COD. IVA")
                 || upper.startsWith("TRASPORTO A CURA");
@@ -337,7 +373,22 @@ public class MaterialeImportService {
                 || "PREZZO".equals(upper)
                 || "DESTINAZIONE".equals(upper)
                 || "PAGINA".equals(upper)
-                || "FOGLIO".equals(upper);
+                || "FOGLIO".equals(upper)
+                || "IVA".equals(upper)
+                || upper.startsWith("PARTITA")
+                || "TOTALE".equals(upper)
+                || "IMPONIBILE".equals(upper)
+                || "IMPOSTA".equals(upper)
+                || "ACCONTO".equals(upper)
+                || "OMAGGIO".equals(upper)
+                || "SCONTO".equals(upper)
+                || "SPESE".equals(upper)
+                || "BOLLI".equals(upper)
+                || "VALUTA".equals(upper)
+                || "PAGAMENTO".equals(upper)
+                || "CLIENTE".equals(upper)
+                || "COLLI".equals(upper)
+                || "TRASPORTO".equals(upper);
     }
 
     private int countMoneyValues(String text) {
@@ -404,13 +455,19 @@ public class MaterialeImportService {
                 "(?i)\\bNUMERO\\s*[:#-]?\\s*([A-Z0-9\\-/]{3,})",
                 "(?i)\\bDDT\\s*[:#-]?\\s*([A-Z0-9\\-/]{3,})",
                 "(?i)\\bDOCUMENTO\\s*[:#-]?\\s*([A-Z0-9\\-/]{3,})",
-                "(?i)\\bPARTITA[/\\s]*DOC\\.?\\s*NR\\.?\\s*[:#-]?\\s*([A-Z0-9\\-/]{3,})"
+                "(?i)\\bPARTITA[/\\s]*DOC\\.?\\s*NR\\.?\\s*[:#-]?\\s*([A-Z0-9\\-/]{3,})",
+                "(?i)\\bN(?:UM(?:ERO)?)?\\.?\\s*DOC(?:UMENTO)?\\.?\\s*[:#-]?\\s*([A-Z0-9\\-/]{3,})",
+                "(?i)\\bDOC(?:UMENTO)?\\.?\\s*N(?:R|UM(?:ERO)?)?\\.?\\s*[:#-]?\\s*([A-Z0-9\\-/]{3,})",
+                "(?i)\\bBOLLA\\s*(?:N(?:R|UM(?:ERO)?)?\\.?)?\\s*[:#-]?\\s*([0-9][A-Z0-9\\-/]{2,})"
         };
 
         for (String p : patterns) {
             Matcher m = Pattern.compile(p).matcher(text);
-            if (m.find()) {
-                return m.group(1).trim();
+            while (m.find()) {
+                String candidate = m.group(1).trim();
+                if (candidate.matches(".*\\d.*")) {
+                    return candidate;
+                }
             }
         }
 
@@ -508,6 +565,9 @@ public class MaterialeImportService {
         private Double prezzoTotale;
         private String cantiereRaw;
         private String fornitoreNome;
+        private String unitaMisura = "";
+        private String sconti = "";
+        private String codiceIva = "";
 
         public BollaRow(String numeroBolla, String nomeMateriale, Double quantita, Double peso, Double prezzoUnitario, String cantiereRaw) {
             this(numeroBolla, "", nomeMateriale, quantita, peso, prezzoUnitario, calcolaPrezzoTotale(quantita, prezzoUnitario), cantiereRaw);
@@ -575,6 +635,30 @@ public class MaterialeImportService {
         public void setFornitoreNome(String fornitoreNome) {
             this.fornitoreNome = fornitoreNome == null ? "" : fornitoreNome.trim();
         }
+
+        public String getUnitaMisura() {
+            return unitaMisura;
+        }
+
+        public void setUnitaMisura(String unitaMisura) {
+            this.unitaMisura = unitaMisura == null ? "" : unitaMisura.trim();
+        }
+
+        public String getSconti() {
+            return sconti;
+        }
+
+        public void setSconti(String sconti) {
+            this.sconti = sconti == null ? "" : sconti.trim();
+        }
+
+        public String getCodiceIva() {
+            return codiceIva;
+        }
+
+        public void setCodiceIva(String codiceIva) {
+            this.codiceIva = codiceIva == null ? "" : codiceIva.trim();
+        }
     }
 
     private static class ValueMatch {
@@ -584,6 +668,10 @@ public class MaterialeImportService {
         ValueMatch(String value, int start) {
             this.value = value;
             this.start = start;
+        }
+
+        int end() {
+            return start + value.length();
         }
     }
 }

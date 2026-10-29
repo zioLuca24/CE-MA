@@ -48,4 +48,28 @@ class MaterialeImportServiceTest {
         assertEquals(150.0, rows.get(2).getQuantita(), 0.001);
         assertEquals("lago patria", rows.get(2).getCantiereRaw());
     }
+
+    @Test
+    void readsUmDiscountAndVatAndSkipsVatSummary() {
+        String text = ""
+                + "CODICE ARTICOLO DESCRIZIONE U.M QUANTITA' PREZZO SCONTI IMPORTO RIGA C.IVA\n"
+                + "I25DS400 IC 400 GRIGIO KG 25 PZ 120,00 1,97 236,68 22\n"
+                + "PREMAR BANCALE PREMAR PZ 4,00 5,05 10,00 18,18 22\n"
+                + "102684 STADIA MURATORE ALL.H MT.3 PZ 2,00 30,33 60,66 22\n"
+                + "IVA 22% = 22,00 388,88 85,55 474,43\n"
+                + "TOTALE DOCUMENTO 474,43\n";
+
+        List<MaterialeImportService.BollaRow> rows = service.righeDaTesto(text);
+
+        assertEquals(3, rows.size());
+        assertEquals("PZ", rows.get(0).getUnitaMisura());
+        assertEquals("", rows.get(0).getSconti());
+        assertEquals("22", rows.get(0).getCodiceIva());
+        assertEquals(236.68, rows.get(0).getPrezzoTotale(), 0.001);
+
+        assertEquals("10,00", rows.get(1).getSconti());
+        assertEquals(5.05, rows.get(1).getPrezzoUnitario(), 0.001);
+        assertEquals(18.18, rows.get(1).getPrezzoTotale(), 0.001);
+        assertEquals("22", rows.get(1).getCodiceIva());
+    }
 }

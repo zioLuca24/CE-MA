@@ -27,6 +27,15 @@ public class BollaMaterialeImport {
     @Column(name = "DESCRIZIONE_ARTICOLO", length = 500)
     private String descrizione;
 
+    @Column(name = "UNITA_MISURA", length = 20)
+    private String unitaMisura;
+
+    @Column(name = "SCONTI", length = 50)
+    private String sconti;
+
+    @Column(name = "CODICE_IVA", length = 10)
+    private String codiceIva;
+
     @ManyToOne
     @JoinColumn(name = "MATERIALE_ID", nullable = false)
     private MaterialeCatalogo materiale;

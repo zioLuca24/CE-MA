@@ -134,9 +134,11 @@ public class MaterialeController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Allegato vuoto.");
         }
 
+        String testo;
         List<MaterialeImportService.BollaRow> rows;
         try {
-            rows = materialeImportService.parseBollaRows(file);
+            testo = materialeImportService.leggiTesto(file);
+            rows = materialeImportService.righeDaTesto(testo);
         } catch (Exception | LinkageError ex) {
             String detail = ex.getMessage() != null ? ex.getMessage() : ex.getClass().getSimpleName();
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, detail, ex);
@@ -147,14 +149,17 @@ public class MaterialeController {
             dto.setNumeroBolla(row.getNumeroBolla());
             dto.setCodiceArticolo(row.getCodiceArticolo());
             dto.setDescrizione(row.getDescrizione());
+            dto.setUnitaMisura(row.getUnitaMisura());
             dto.setQuantita(row.getQuantita());
             dto.setPrezzoUnitario(row.getPrezzoUnitario());
+            dto.setSconti(row.getSconti());
             dto.setImportoRiga(row.getPrezzoTotale());
+            dto.setCodiceIva(row.getCodiceIva());
             dto.setCantiereRaw(row.getCantiereRaw());
             return dto;
         }).collect(Collectors.toList());
 
-        return ResponseEntity.ok(new AnteprimaBollaResponse(righe));
+        return ResponseEntity.ok(new AnteprimaBollaResponse(righe, testo == null ? "" : testo));
     }
 
     @PostMapping("/bolle/conferma")
@@ -173,7 +178,7 @@ public class MaterialeController {
             String numeroBolla = dto.getNumeroBolla() == null || dto.getNumeroBolla().trim().isEmpty()
                     ? "SENZA-NUMERO" : dto.getNumeroBolla().trim();
             String codice = dto.getCodiceArticolo() == null ? "" : dto.getCodiceArticolo().trim();
-            rows.add(new MaterialeImportService.BollaRow(
+            MaterialeImportService.BollaRow nuovaRiga = new MaterialeImportService.BollaRow(
                     numeroBolla,
                     codice,
                     descrizione,
@@ -182,7 +187,11 @@ public class MaterialeController {
                     dto.getPrezzoUnitario() == null ? 0.0 : dto.getPrezzoUnitario(),
                     dto.getImportoRiga() == null ? 0.0 : dto.getImportoRiga(),
                     dto.getCantiereRaw()
-            ));
+            );
+            nuovaRiga.setUnitaMisura(dto.getUnitaMisura());
+            nuovaRiga.setSconti(dto.getSconti());
+            nuovaRiga.setCodiceIva(dto.getCodiceIva());
+            rows.add(nuovaRiga);
         }
 
         return ResponseEntity.ok(salvaRighe(rows, request.getCantiereId(), request.getFornitoreNome(), request.getFileOrigine()));
@@ -390,7 +399,7 @@ public class MaterialeController {
         MaterialeCatalogo materiale = new MaterialeCatalogo();
         materiale.setNome(row.getNomeMateriale());
         materiale.setCategoria("DA_CLASSIFICARE");
-        materiale.setUnitaMisura("pz");
+        materiale.setUnitaMisura(row.getUnitaMisura() == null || row.getUnitaMisura().isEmpty() ? "pz" : row.getUnitaMisura().toLowerCase());
         materiale.setDescrizione(componiDescrizioneMateriale(row));
         materiale.setPrezzoMedio(row.getPrezzoUnitario());
         materiale.setQuantitaAcquistataTotale(0.0);
@@ -429,6 +438,9 @@ public class MaterialeController {
         record.setNumeroBolla(row.getNumeroBolla());
         record.setCodiceArticolo(row.getCodiceArticolo());
         record.setDescrizione(row.getDescrizione());
+        record.setUnitaMisura(row.getUnitaMisura());
+        record.setSconti(row.getSconti());
+        record.setCodiceIva(row.getCodiceIva());
         record.setMateriale(materiale);
         record.setCantiere(cantiere);
         record.setQuantita(row.getQuantita());
@@ -488,9 +500,12 @@ public class MaterialeController {
         private String numeroBolla;
         private String codiceArticolo;
         private String descrizione;
+        private String unitaMisura;
         private Double quantita;
         private Double prezzoUnitario;
+        private String sconti;
         private Double importoRiga;
+        private String codiceIva;
         private String cantiereRaw;
     }
 
@@ -498,6 +513,7 @@ public class MaterialeController {
     @AllArgsConstructor
     private static class AnteprimaBollaResponse {
         private List<RigaBollaDto> righe;
+        private String testoOcr;
     }
 
     @Data

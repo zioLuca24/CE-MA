@@ -48,10 +48,41 @@
             <input id="allegatoFile" type="file" accept=".pdf,.jpg,.jpeg,.png"
                    style="border:1px solid var(--border);border-radius:12px;padding:8px;background:var(--bg-card-2);color:var(--text);">
         </div>
-        <button class="btn" onclick="importaBolla()">Importa bolla</button>
+        <button class="btn" onclick="leggiBolla()">Leggi bolla</button>
         <div id="importMessage" class="muted" style="margin-top:10px;"></div>
         <div class="muted" style="margin-top:12px;">
             Il riconoscimento automatico del fornitore e' temporaneamente disattivato: inseriscilo manualmente qui sopra.
+        </div>
+    </section>
+
+    <section id="anteprimaSection" class="card" style="padding: 16px; margin-bottom: 16px; display:none;">
+        <div class="toolbar">
+            <strong>Controlla le righe lette</strong>
+            <span class="muted">Correggi i valori sbagliati prima di salvare. Elimina le righe che non servono.</span>
+        </div>
+        <div class="field" style="max-width:320px;">
+            <label for="numeroBollaInput">Numero bolla</label>
+            <input id="numeroBollaInput" type="text"
+                   style="border:1px solid var(--border);border-radius:12px;padding:10px;background:var(--bg-card-2);color:var(--text);">
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                <tr>
+                    <th>Codice articolo</th>
+                    <th>Descrizione</th>
+                    <th>Quantit&agrave;</th>
+                    <th>Prezzo</th>
+                    <th>Importo riga</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody id="anteprimaRows"></tbody>
+            </table>
+        </div>
+        <div style="margin-top:12px; display:flex; gap:8px;">
+            <button class="btn" onclick="confermaBolla()">Conferma e salva</button>
+            <button class="btn" onclick="annullaAnteprima()">Annulla</button>
         </div>
     </section>
 
@@ -102,7 +133,18 @@
             (data || []).map(c => `<option value="${c.id}">${c.nome}</option>`).join("");
     }
 
-    async function importaBolla() {
+    function esc(value) {
+        return String(value ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    function numVal(value) {
+        const parsed = parseFloat(String(value).replace(",", "."));
+        return Number.isFinite(parsed) ? parsed : null;
+    }
+
+    let anteprimaCantiereRaw = "";
+
+    async function leggiBolla() {
         const fileInput = document.getElementById("allegatoFile");
         const cantiereSelect = document.getElementById("cantiereSelect");
         const message = document.getElementById("importMessage");
@@ -116,26 +158,97 @@
             return;
         }
 
+        message.textContent = "Lettura in corso...";
         const formData = new FormData();
         formData.append("file", fileInput.files[0]);
-        formData.append("cantiereId", cantiereSelect.value);
 
-        const fornitoreInput = document.getElementById("fornitoreInput").value.trim();
-        if (fornitoreInput) {
-            formData.append("fornitoreNome", fornitoreInput);
+        let response;
+        try {
+            response = await fetch("/api/materiali/bolle/anteprima", { method: "POST", body: formData });
+        } catch (e) {
+            message.textContent = "Errore di rete: impossibile contattare il server.";
+            return;
         }
-
-        const response = await fetch("/api/materiali/bolle/importa", { method: "POST", body: formData });
         const payload = await response.json().catch(() => ({}));
 
         if (!response.ok) {
-            message.textContent = "Errore: " + (payload.message || "importazione non riuscita.");
+            message.textContent = "Errore (" + response.status + "): " + (payload.message || "lettura non riuscita.");
+            return;
+        }
+
+        const righe = payload.righe || [];
+        anteprimaCantiereRaw = righe.length ? (righe[0].cantiereRaw || "") : "";
+        document.getElementById("numeroBollaInput").value = righe.length ? (righe[0].numeroBolla || "") : "";
+        document.getElementById("anteprimaRows").innerHTML = righe.map(rigaAnteprimaHtml).join("");
+        document.getElementById("anteprimaSection").style.display = "block";
+        message.textContent = `Lette ${righe.length} righe: controllale e conferma.`;
+    }
+
+    function rigaAnteprimaHtml(riga) {
+        const style = "style='width:100%;border:1px solid var(--border);border-radius:8px;padding:6px;background:var(--bg-card-2);color:var(--text);'";
+        return `
+            <tr>
+                <td><input data-f="codiceArticolo" value="${esc(riga.codiceArticolo)}" ${style}></td>
+                <td><input data-f="descrizione" value="${esc(riga.descrizione)}" ${style}></td>
+                <td><input data-f="quantita" value="${esc(riga.quantita)}" ${style}></td>
+                <td><input data-f="prezzoUnitario" value="${esc(riga.prezzoUnitario)}" ${style}></td>
+                <td><input data-f="importoRiga" value="${esc(riga.importoRiga)}" ${style}></td>
+                <td><button class="btn" onclick="this.closest('tr').remove()">Elimina</button></td>
+            </tr>`;
+    }
+
+    function annullaAnteprima() {
+        document.getElementById("anteprimaRows").innerHTML = "";
+        document.getElementById("anteprimaSection").style.display = "none";
+        document.getElementById("importMessage").textContent = "";
+    }
+
+    async function confermaBolla() {
+        const message = document.getElementById("importMessage");
+        const fileInput = document.getElementById("allegatoFile");
+        const numeroBolla = document.getElementById("numeroBollaInput").value.trim();
+
+        const righe = Array.from(document.querySelectorAll("#anteprimaRows tr")).map(tr => {
+            const get = f => tr.querySelector(`[data-f='${f}']`).value;
+            return {
+                numeroBolla,
+                codiceArticolo: get("codiceArticolo").trim(),
+                descrizione: get("descrizione").trim(),
+                quantita: numVal(get("quantita")),
+                prezzoUnitario: numVal(get("prezzoUnitario")),
+                importoRiga: numVal(get("importoRiga")),
+                cantiereRaw: anteprimaCantiereRaw
+            };
+        });
+
+        if (!righe.length) {
+            message.textContent = "Non ci sono righe da salvare.";
+            return;
+        }
+
+        const body = {
+            cantiereId: Number(document.getElementById("cantiereSelect").value),
+            fornitoreNome: document.getElementById("fornitoreInput").value.trim(),
+            fileOrigine: fileInput.files.length ? fileInput.files[0].name : "",
+            righe
+        };
+
+        const response = await fetch("/api/materiali/bolle/conferma", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body)
+        });
+        const payload = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+            message.textContent = "Errore (" + response.status + "): " + (payload.message || "salvataggio non riuscito.");
             return;
         }
 
         const errori = payload.errori && payload.errori.length ? ` Errori: ${payload.errori.join(" | ")}` : "";
-        message.textContent = `Import completato: ${payload.righeImportate} righe.` + errori;
         fileInput.value = "";
+        annullaAnteprima();
+        message.textContent = `Salvate ${payload.righeImportate} righe.` + errori;
         await loadBolle();
     }
 

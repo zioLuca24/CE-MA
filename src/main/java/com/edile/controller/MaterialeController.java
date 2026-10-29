@@ -13,6 +13,7 @@ import com.edile.repository.MovimentoMaterialeRepository;
 import com.edile.service.MaterialeImportService;
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -119,10 +120,75 @@ public class MaterialeController {
         List<MaterialeImportService.BollaRow> rows;
         try {
             rows = materialeImportService.parseBollaRows(file);
-        } catch (Exception ex) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ex.getMessage(), ex);
+        } catch (Exception | LinkageError ex) {
+            String detail = ex.getMessage() != null ? ex.getMessage() : ex.getClass().getSimpleName();
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, detail, ex);
         }
 
+        return ResponseEntity.ok(salvaRighe(rows, cantiereId, fornitoreNome, file.getOriginalFilename()));
+    }
+
+    @PostMapping(value = "/bolle/anteprima", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<AnteprimaBollaResponse> anteprimaBollaMateriali(@RequestParam("file") MultipartFile file) {
+        if (file.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Allegato vuoto.");
+        }
+
+        List<MaterialeImportService.BollaRow> rows;
+        try {
+            rows = materialeImportService.parseBollaRows(file);
+        } catch (Exception | LinkageError ex) {
+            String detail = ex.getMessage() != null ? ex.getMessage() : ex.getClass().getSimpleName();
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, detail, ex);
+        }
+
+        List<RigaBollaDto> righe = rows.stream().map(row -> {
+            RigaBollaDto dto = new RigaBollaDto();
+            dto.setNumeroBolla(row.getNumeroBolla());
+            dto.setCodiceArticolo(row.getCodiceArticolo());
+            dto.setDescrizione(row.getDescrizione());
+            dto.setQuantita(row.getQuantita());
+            dto.setPrezzoUnitario(row.getPrezzoUnitario());
+            dto.setImportoRiga(row.getPrezzoTotale());
+            dto.setCantiereRaw(row.getCantiereRaw());
+            return dto;
+        }).collect(Collectors.toList());
+
+        return ResponseEntity.ok(new AnteprimaBollaResponse(righe));
+    }
+
+    @PostMapping("/bolle/conferma")
+    public ResponseEntity<ImportBollaResponse> confermaBollaMateriali(@RequestBody ConfermaBollaRequest request) {
+        if (request == null || request.getRighe() == null || request.getRighe().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Nessuna riga da salvare.");
+        }
+
+        List<MaterialeImportService.BollaRow> rows = new ArrayList<>();
+        for (RigaBollaDto dto : request.getRighe()) {
+            String descrizione = dto.getDescrizione() == null ? "" : dto.getDescrizione().trim();
+            if (descrizione.isEmpty() || dto.getQuantita() == null || dto.getQuantita() <= 0.0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Ogni riga richiede descrizione e quantita' maggiore di zero.");
+            }
+            String numeroBolla = dto.getNumeroBolla() == null || dto.getNumeroBolla().trim().isEmpty()
+                    ? "SENZA-NUMERO" : dto.getNumeroBolla().trim();
+            String codice = dto.getCodiceArticolo() == null ? "" : dto.getCodiceArticolo().trim();
+            rows.add(new MaterialeImportService.BollaRow(
+                    numeroBolla,
+                    codice,
+                    descrizione,
+                    dto.getQuantita(),
+                    0.0,
+                    dto.getPrezzoUnitario() == null ? 0.0 : dto.getPrezzoUnitario(),
+                    dto.getImportoRiga() == null ? 0.0 : dto.getImportoRiga(),
+                    dto.getCantiereRaw()
+            ));
+        }
+
+        return ResponseEntity.ok(salvaRighe(rows, request.getCantiereId(), request.getFornitoreNome(), request.getFileOrigine()));
+    }
+
+    private ImportBollaResponse salvaRighe(List<MaterialeImportService.BollaRow> rows, Long cantiereId, String fornitoreNome, String filename) {
         String fornitoreOverride = normalizzaFornitore(fornitoreNome);
         if (!fornitoreOverride.isEmpty()) {
             fornitoreRepository.findByNomeIgnoreCase(fornitoreOverride)
@@ -153,13 +219,13 @@ public class MaterialeController {
             List<MaterialeCatalogo> trovati = materialeRepository.findByNomeIgnoreCaseList(row.getNomeMateriale());
             MaterialeCatalogo materiale = trovati.isEmpty() ? creaMaterialeBase(row) : aggiornaMaterialeImportato(trovati.get(0), row);
 
-            bollaImportRepository.save(creaImportRecord(row, cantiere, materiale, file.getOriginalFilename()));
+            bollaImportRepository.save(creaImportRecord(row, cantiere, materiale, filename));
             movimentoRepository.save(creaMovimentoCarico(cantiere, materiale, row.getQuantita(), row.getNumeroBolla()));
             aggiornaQuantitaMateriale(materiale.getId());
             importate++;
         }
 
-        return ResponseEntity.ok(new ImportBollaResponse(importate, errori));
+        return new ImportBollaResponse(importate, errori);
     }
 
     @GetMapping("/anagrafica")
@@ -414,6 +480,33 @@ public class MaterialeController {
     private static class ImportBollaResponse {
         private Integer righeImportate;
         private List<String> errori;
+    }
+
+    @Data
+    @NoArgsConstructor
+    private static class RigaBollaDto {
+        private String numeroBolla;
+        private String codiceArticolo;
+        private String descrizione;
+        private Double quantita;
+        private Double prezzoUnitario;
+        private Double importoRiga;
+        private String cantiereRaw;
+    }
+
+    @Data
+    @AllArgsConstructor
+    private static class AnteprimaBollaResponse {
+        private List<RigaBollaDto> righe;
+    }
+
+    @Data
+    @NoArgsConstructor
+    private static class ConfermaBollaRequest {
+        private Long cantiereId;
+        private String fornitoreNome;
+        private String fileOrigine;
+        private List<RigaBollaDto> righe;
     }
 
     @Data

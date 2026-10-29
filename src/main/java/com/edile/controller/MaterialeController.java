@@ -15,6 +15,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -33,6 +35,8 @@ import java.util.stream.Collectors;
 @RequestMapping("/materiali")
 @CrossOrigin(origins = "*")
 public class MaterialeController {
+
+    private static final Logger LOG = LoggerFactory.getLogger(MaterialeController.class);
 
     @Autowired
     private MaterialeCatalogoRepository materialeRepository;
@@ -136,13 +140,17 @@ public class MaterialeController {
 
         String testo;
         List<MaterialeImportService.BollaRow> rows;
+        long inizio = System.currentTimeMillis();
         try {
-            testo = materialeImportService.leggiTesto(file);
-            rows = materialeImportService.righeDaTesto(testo);
+            MaterialeImportService.LetturaBolla lettura = materialeImportService.leggiBolla(file);
+            testo = lettura.getTesto();
+            rows = lettura.getRighe();
         } catch (Exception | LinkageError ex) {
             String detail = ex.getMessage() != null ? ex.getMessage() : ex.getClass().getSimpleName();
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, detail, ex);
         }
+        long tempoMs = System.currentTimeMillis() - inizio;
+        LOG.info("Lettura bolla {} ({} byte): {} ms, {} righe", file.getOriginalFilename(), file.getSize(), tempoMs, rows.size());
 
         List<RigaBollaDto> righe = rows.stream().map(row -> {
             RigaBollaDto dto = new RigaBollaDto();
@@ -159,7 +167,7 @@ public class MaterialeController {
             return dto;
         }).collect(Collectors.toList());
 
-        return ResponseEntity.ok(new AnteprimaBollaResponse(righe, testo == null ? "" : testo));
+        return ResponseEntity.ok(new AnteprimaBollaResponse(righe, testo == null ? "" : testo, tempoMs));
     }
 
     @PostMapping("/bolle/conferma")
@@ -197,7 +205,33 @@ public class MaterialeController {
         return ResponseEntity.ok(salvaRighe(rows, request.getCantiereId(), request.getFornitoreNome(), request.getFileOrigine()));
     }
 
+    private static String tronca(String value, int max) {
+        if (value == null) {
+            return null;
+        }
+        String v = value.trim();
+        return v.length() <= max ? v : v.substring(0, max);
+    }
+
+    private static Double numeroSicuro(Double value) {
+        if (value == null || value.isNaN() || value.isInfinite() || Math.abs(value) >= 1.0e10) {
+            return 0.0;
+        }
+        return value;
+    }
+
     private ImportBollaResponse salvaRighe(List<MaterialeImportService.BollaRow> rows, Long cantiereId, String fornitoreNome, String filename) {
+        try {
+            return salvaRigheInterno(rows, cantiereId, fornitoreNome, filename);
+        } catch (org.springframework.dao.DataAccessException ex) {
+            Throwable root = ex.getMostSpecificCause();
+            String detail = root != null && root.getMessage() != null ? root.getMessage() : ex.getMessage();
+            LOG.error("Salvataggio bolla non riuscito", ex);
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Salvataggio non riuscito: " + detail, ex);
+        }
+    }
+
+    private ImportBollaResponse salvaRigheInterno(List<MaterialeImportService.BollaRow> rows, Long cantiereId, String fornitoreNome, String filename) {
         String fornitoreOverride = normalizzaFornitore(fornitoreNome);
         if (!fornitoreOverride.isEmpty()) {
             fornitoreRepository.findByNomeIgnoreCase(fornitoreOverride)
@@ -397,11 +431,11 @@ public class MaterialeController {
 
     private MaterialeCatalogo creaMaterialeBase(MaterialeImportService.BollaRow row) {
         MaterialeCatalogo materiale = new MaterialeCatalogo();
-        materiale.setNome(row.getNomeMateriale());
+        materiale.setNome(tronca(row.getNomeMateriale(), 255));
         materiale.setCategoria("DA_CLASSIFICARE");
-        materiale.setUnitaMisura(row.getUnitaMisura() == null || row.getUnitaMisura().isEmpty() ? "pz" : row.getUnitaMisura().toLowerCase());
-        materiale.setDescrizione(componiDescrizioneMateriale(row));
-        materiale.setPrezzoMedio(row.getPrezzoUnitario());
+        materiale.setUnitaMisura(row.getUnitaMisura() == null || row.getUnitaMisura().isEmpty() ? "pz" : tronca(row.getUnitaMisura().toLowerCase(), 20));
+        materiale.setDescrizione(tronca(componiDescrizioneMateriale(row), 500));
+        materiale.setPrezzoMedio(numeroSicuro(row.getPrezzoUnitario()));
         materiale.setQuantitaAcquistataTotale(0.0);
         materiale.setQuantitaUtilizzataTotale(0.0);
         materiale.setQuantitaResidua(0.0);
@@ -411,10 +445,10 @@ public class MaterialeController {
     private MaterialeCatalogo aggiornaMaterialeImportato(MaterialeCatalogo materiale, MaterialeImportService.BollaRow row) {
         boolean changed = false;
         if ((materiale.getDescrizione() == null || materiale.getDescrizione().trim().isEmpty()) && row.getDescrizione() != null && !row.getDescrizione().trim().isEmpty()) {
-            materiale.setDescrizione(componiDescrizioneMateriale(row));
+            materiale.setDescrizione(tronca(componiDescrizioneMateriale(row), 500));
             changed = true;
         }
-        if (row.getPrezzoUnitario() != null && row.getPrezzoUnitario() > 0.0) {
+        if (row.getPrezzoUnitario() != null && row.getPrezzoUnitario() > 0.0 && row.getPrezzoUnitario() < 1.0e10) {
             materiale.setPrezzoMedio(row.getPrezzoUnitario());
             changed = true;
         }
@@ -435,21 +469,21 @@ public class MaterialeController {
 
     private BollaMaterialeImport creaImportRecord(MaterialeImportService.BollaRow row, Cantiere cantiere, MaterialeCatalogo materiale, String filename) {
         BollaMaterialeImport record = new BollaMaterialeImport();
-        record.setNumeroBolla(row.getNumeroBolla());
-        record.setCodiceArticolo(row.getCodiceArticolo());
-        record.setDescrizione(row.getDescrizione());
-        record.setUnitaMisura(row.getUnitaMisura());
-        record.setSconti(row.getSconti());
-        record.setCodiceIva(row.getCodiceIva());
+        record.setNumeroBolla(tronca(row.getNumeroBolla(), 80));
+        record.setCodiceArticolo(tronca(row.getCodiceArticolo(), 80));
+        record.setDescrizione(tronca(row.getDescrizione(), 500));
+        record.setUnitaMisura(tronca(row.getUnitaMisura(), 20));
+        record.setSconti(tronca(row.getSconti(), 50));
+        record.setCodiceIva(tronca(row.getCodiceIva(), 10));
         record.setMateriale(materiale);
         record.setCantiere(cantiere);
-        record.setQuantita(row.getQuantita());
-        record.setPeso(row.getPeso());
-        record.setPrezzoUnitario(row.getPrezzoUnitario());
-        record.setPrezzoTotale(row.getPrezzoTotale());
-        record.setFornitoreNome(row.getFornitoreNome());
+        record.setQuantita(numeroSicuro(row.getQuantita()));
+        record.setPeso(numeroSicuro(row.getPeso()));
+        record.setPrezzoUnitario(numeroSicuro(row.getPrezzoUnitario()));
+        record.setPrezzoTotale(numeroSicuro(row.getPrezzoTotale()));
+        record.setFornitoreNome(tronca(row.getFornitoreNome(), 255));
         record.setDataImport(LocalDate.now());
-        record.setFileOrigine(filename);
+        record.setFileOrigine(tronca(filename, 255));
         return record;
     }
 
@@ -458,9 +492,9 @@ public class MaterialeController {
         movimento.setCantiere(cantiere);
         movimento.setMateriale(materiale);
         movimento.setTipoMovimento("CARICO");
-        movimento.setQuantita(quantita);
+        movimento.setQuantita(numeroSicuro(quantita));
         movimento.setDataMovimento(LocalDate.now());
-        movimento.setNote("Carico da bolla " + numeroBolla);
+        movimento.setNote(tronca("Carico da bolla " + numeroBolla, 500));
         return movimento;
     }
 
@@ -514,6 +548,7 @@ public class MaterialeController {
     private static class AnteprimaBollaResponse {
         private List<RigaBollaDto> righe;
         private String testoOcr;
+        private Long tempoMs;
     }
 
     @Data

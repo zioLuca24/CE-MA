@@ -165,7 +165,7 @@
         }
         try {
             const bitmap = await createImageBitmap(file);
-            const maxSide = 2200;
+            const maxSide = 2400;
             const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
             const canvas = document.createElement("canvas");
             canvas.width = Math.round(bitmap.width * scale);
@@ -221,9 +221,10 @@
         document.getElementById("anteprimaRows").innerHTML = righe.map(rigaAnteprimaHtml).join("");
         document.getElementById("testoOcr").textContent = payload.testoOcr || "";
         document.getElementById("anteprimaSection").style.display = "block";
+        const secondi = payload.tempoMs ? ` (lettura in ${(payload.tempoMs / 1000).toFixed(1)} s)` : "";
         message.textContent = righe.length
-            ? `Lette ${righe.length} righe: controllale e conferma.`
-            : "Nessuna riga riconosciuta: aggiungi le righe a mano oppure consulta il testo letto dall'OCR.";
+            ? `Lette ${righe.length} righe${secondi}: controllale e conferma.`
+            : `Nessuna riga riconosciuta${secondi}: aggiungi le righe a mano oppure consulta il testo letto dall'OCR.`;
     }
 
     function rigaAnteprimaHtml(riga) {

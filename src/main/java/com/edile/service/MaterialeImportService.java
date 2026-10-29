@@ -51,6 +51,101 @@ public class MaterialeImportService {
         return text == null || text.trim().isEmpty() ? new ArrayList<BollaRow>() : parseRows(text);
     }
 
+    /** Legge la bolla: PDF con testo -> parser testuale; foto/scansioni -> OCR con coordinate e ricostruzione della tabella. */
+    public LetturaBolla leggiBolla(MultipartFile file) throws IOException {
+        String filename = file.getOriginalFilename() == null ? "" : file.getOriginalFilename().toLowerCase(Locale.ROOT);
+        String contentType = file.getContentType() == null ? "" : file.getContentType().toLowerCase(Locale.ROOT);
+
+        if (filename.endsWith(".pdf") || contentType.contains("pdf")) {
+            try (PDDocument document = PDDocument.load(file.getInputStream())) {
+                String text = new PDFTextStripper().getText(document);
+                if (text != null && !text.trim().isEmpty()) {
+                    return new LetturaBolla(text, righeDaTesto(text));
+                }
+                StringBuilder allText = new StringBuilder();
+                List<BollaRow> allRows = new ArrayList<>();
+                PDFRenderer renderer = new PDFRenderer(document);
+                for (int page = 0; page < document.getNumberOfPages(); page++) {
+                    LetturaBolla letta = leggiImmagine(renderer.renderImageWithDPI(page, 200));
+                    allText.append(letta.getTesto()).append('\n');
+                    allRows.addAll(letta.getRighe());
+                }
+                return new LetturaBolla(allText.toString(), allRows);
+            }
+        }
+
+        boolean immagine = filename.endsWith(".jpg") || filename.endsWith(".jpeg") || filename.endsWith(".png")
+                || contentType.contains("jpeg") || contentType.contains("jpg") || contentType.contains("png");
+        if (!immagine) {
+            throw new IllegalArgumentException("Formato non supportato. Carica un PDF, JPG o PNG.");
+        }
+        BufferedImage image = ImageIO.read(file.getInputStream());
+        if (image == null) {
+            throw new IllegalArgumentException("Immagine non valida.");
+        }
+        return leggiImmagine(image);
+    }
+
+    private LetturaBolla leggiImmagine(BufferedImage image) {
+        int[] modes = new int[] { SimpleImageOcr.PSM_SPARSE, SimpleImageOcr.PSM_AUTO };
+        String testo = "";
+        for (int mode : modes) {
+            List<OcrWord> words = SimpleImageOcr.extractWords(image, mode);
+            List<BollaTableParser.ParsedRow> parsed = BollaTableParser.parse(words);
+            String ricostruito = BollaTableParser.toText(words);
+            if (testo.isEmpty()) {
+                testo = ricostruito;
+            }
+            if (!parsed.isEmpty()) {
+                return new LetturaBolla(ricostruito, convertiRighe(parsed, ricostruito));
+            }
+        }
+
+        String semplice = SimpleImageOcr.extractText(image);
+        return new LetturaBolla(testo.trim().isEmpty() ? semplice : testo + "\n--- OCR a blocco unico ---\n" + semplice, righeDaTesto(semplice));
+    }
+
+    private List<BollaRow> convertiRighe(List<BollaTableParser.ParsedRow> parsed, String testo) {
+        String numeroBolla = estraiNumeroBolla(testo);
+        String cantiereRaw = estraiDestinazione(testo);
+        List<BollaRow> righe = new ArrayList<>();
+        for (BollaTableParser.ParsedRow p : parsed) {
+            BollaRow row = new BollaRow(
+                    numeroBolla,
+                    p.codice,
+                    p.descrizione,
+                    p.quantita,
+                    0.0,
+                    p.prezzo == null ? 0.0 : p.prezzo,
+                    p.importo == null ? 0.0 : p.importo,
+                    cantiereRaw
+            );
+            row.setUnitaMisura(p.um);
+            row.setSconti(p.sconti);
+            row.setCodiceIva(p.iva);
+            righe.add(row);
+        }
+        return righe;
+    }
+
+    public static class LetturaBolla {
+        private final String testo;
+        private final List<BollaRow> righe;
+
+        public LetturaBolla(String testo, List<BollaRow> righe) {
+            this.testo = testo == null ? "" : testo;
+            this.righe = righe;
+        }
+
+        public String getTesto() {
+            return testo;
+        }
+
+        public List<BollaRow> getRighe() {
+            return righe;
+        }
+    }
+
     private String extractText(MultipartFile file) throws IOException {
         String filename = file.getOriginalFilename() == null ? "" : file.getOriginalFilename().toLowerCase(Locale.ROOT);
         String contentType = file.getContentType() == null ? "" : file.getContentType().toLowerCase(Locale.ROOT);

@@ -11,8 +11,9 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-ita tesseract-ocr-eng fontconfig fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 ENV TESSDATA_PREFIX=/usr/share/tesseract-ocr/5/tessdata
+ENV OMP_THREAD_LIMIT=1
 WORKDIR /app
 COPY --from=builder /build/target/gestionale-edile-1.0.0.jar .
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 CMD wget --no-verbose --tries=1 --spider http://localhost:8080/api/ || exit 1
-CMD ["java", "-Xmx512m", "-jar", "gestionale-edile-1.0.0.jar"]
+CMD ["java", "-Xmx320m", "-jar", "gestionale-edile-1.0.0.jar"]
